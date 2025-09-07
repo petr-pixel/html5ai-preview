@@ -3,16 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>html5ai — animations & specs build</title>
+  <title>html5ai — live animations build</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
 <header class="hdr">
   <div class="bar">
-    <div class="brand"><div class="logo">AI</div><div><strong>html5ai</strong><div class="tag">AI HTML5 banners • animations & specs</div></div></div>
+    <div class="brand"><div class="logo">AI</div><div><strong>html5ai</strong><div class="tag">AI HTML5 banners • live preview & specs</div></div></div>
     <div class="row">
       <button class="btn ghost" id="newProject">Nový projekt</button>
       <button class="btn" id="importUrl">Extract z URL</button>
+      <label class="pill" style="gap:6px"><input id="strictExport" type="checkbox"> Strict export ≤150&nbsp;kB</label>
       <button class="btn primary" id="exportZipTop">Export HTML5</button>
     </div>
   </div>
@@ -47,18 +48,14 @@
           <label>Velikost</label><input id="hSize" type="number" value="28" min="8" max="120">
           <label>Barva</label><input id="hColor" type="color" value="#ffffff">
           <label>Font</label>
-          <select id="hFont">
-            <option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option>
-          </select>
+          <select id="hFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select>
         </div>
         <div class="card">
           <div class="mini">Subline</div>
           <label>Velikost</label><input id="sSize" type="number" value="16" min="8" max="120">
           <label>Barva</label><input id="sColor" type="color" value="#cfe3ff">
           <label>Font</label>
-          <select id="sFont">
-            <option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option>
-          </select>
+          <select id="sFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select>
         </div>
         <div class="card">
           <div class="mini">CTA</div>
@@ -66,9 +63,7 @@
           <label>Text barva</label><input id="cTextColor" type="color" value="#061123">
           <label>Pozadí</label><input id="cBgColor" type="color" value="#E4572E">
           <label>Font</label>
-          <select id="cFont">
-            <option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option>
-          </select>
+          <select id="cFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select>
         </div>
       </div>
       <label>Vlastní font (WOFF/WOFF2, volitelné — vloží se inline)</label>
@@ -81,6 +76,15 @@
         <summary>Per-formát pozice (BG, Logo, Texty & CTA)</summary>
         <div id="perSize"></div>
       </details>
+
+      <div class="title mt">AI Copy</div>
+      <div id="aiPanel" class="aiPanel">
+        <div class="row">
+          <input id="kw" type="text" placeholder="Klíčová slova (např. zimní bunda, nepromokavá, sleva 30 %)">
+          <button id="genKw" class="btn">+ Vytvořit z KW</button>
+        </div>
+        <div id="variants" class="variants"></div>
+      </div>
 
       <div class="title mt">Rozměry</div>
       <div id="sizes" class="sizes">
@@ -125,12 +129,15 @@
     </section>
 
     <section class="panel">
-      <div class="row space"><div class="title">Live preview</div><div class="pill">Klikni & táhni: BG, logo, headline, subline, CTA</div></div>
+      <div class="row space">
+        <div class="title">Live preview</div>
+        <div class="pill">Klikni & táhni: BG, logo, headline, subline, CTA • <button id="replayAll" class="btn ghost" style="padding:4px 8px">Replay</button></div>
+      </div>
       <div id="preview" class="previewGrid"></div>
       <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn primary" id="exportZip">Export HTML5</button></div>
     </section>
   </main>
-  <footer>© 2025 html5ai — animations & specs build (CSP-safe, no external CDN)</footer>
+  <footer>© 2025 html5ai — live preview build (CSP-safe, no external CDN)</footer>
 </div>
 <script src="app.js" defer></script>
 </body>
