@@ -48,3 +48,8 @@ footer{color:#7e8fb5;text-align:center;margin:30px 0}.mini{font-size:12px;color:
 .variants{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}
 .vcard{background:#0e1935;border:1px solid var(--border);border-radius:12px;padding:10px}
 .vcard .row{justify-content:flex-end}
+/* Hide AI Copy panel for now */
+.aiPanel{display:none!important}
+
+.previewGrid.wide{grid-template-columns:1fr}
+.previewGrid.wide .previewCard{max-width:970px;margin:0 auto}

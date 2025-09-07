@@ -90,8 +90,10 @@
 
   // --------------- Preview renderer ---------------
   function activeSizes(){ return sizes.filter(s=>s.on); }
+  function isWide(key){ return ['320x50','320x100','728x90','970x90'].includes(key); }
   function render(){
     var grid = el('preview'); grid.innerHTML='';
+    var gridWide = el('previewWide'); if(gridWide) gridWide.innerHTML='';
     var headline=el('headline').value, subline=el('subline').value, cta=el('cta').value;
     var click=el('clickUrl').value, bgCss=el('bg').value;
     var logoUrl=el('logoUrl').value || inlineLogoData, bgUrl=el('bgUrl').value || inlineBgData;
@@ -153,7 +155,8 @@
       }
 
       banner.appendChild(H); banner.appendChild(S); banner.appendChild(C);
-      card.appendChild(head); card.appendChild(canvas); canvas.appendChild(banner); grid.appendChild(card);
+      card.appendChild(head); card.appendChild(canvas); canvas.appendChild(banner);
+      if(isWide(s.key) && gridWide){ gridWide.appendChild(card); } else { grid.appendChild(card); }
     });
     applyPreviewAnim();
     renderPerSize(); validate();
