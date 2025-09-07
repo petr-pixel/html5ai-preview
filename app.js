@@ -68,9 +68,33 @@
     return '';
   }
 
+  
   function applyPreviewAnim(){
     var style = document.getElementById('animStyle');
     if(!style){ style = document.createElement('style'); style.id='animStyle'; document.head.appendChild(style); }
+    style.textContent = presetCss(el('animPreset').value, el('animDur').value);
+
+    var loops = Math.min(3, parseInt(el('animLoops').value,10) || 1);
+    var dur = (parseFloat(el('animDur').value) || 2) + 0.6;
+    var stopAfter = Math.min(30, loops * dur);
+
+    var nodes = document.querySelectorAll('.banner .headline,.banner .subline,.banner .cta,.banner img');
+    // hard reset
+    nodes.forEach(function(n){ n.style.animation = 'none'; n.style.animationIterationCount = ''; n.style.animationPlayState='running'; });
+    // force reflow
+    void document.body.offsetWidth;
+    // re-apply
+    nodes.forEach(function(n){
+      n.style.animation = ''; // CSS from style tag applies
+      n.style.animationIterationCount = String(loops);
+      n.style.animationPlayState = 'running';
+    });
+    // stop after limit
+    setTimeout(function(){
+      nodes.forEach(function(n){ n.style.animationPlayState='paused'; });
+    }, stopAfter*1000);
+  }
+
     style.textContent = presetCss(el('animPreset').value, el('animDur').value);
     // set iteration counts and stop timer for preview
     var loops = Math.min(3, parseInt(el('animLoops').value,10)||1);
@@ -481,10 +505,10 @@
   });
   on('logoFile','change', function(e){ readFileToUrl(e.target, function(url){ el('logoUrl').value=url; inlineLogoData=url; render(); }); });
   on('bgFile','change', function(e){ readFileToUrl(e.target, function(url){ el('bgUrl').value=url; inlineBgData=url; render(); }); });
-  on('fontFile','change', function(e){ readFileToUrl(e.target, function(url){ fontDataUrl=url; render(); }); });
-  on('importUrl','click', function(){ smartExtract(el('brandUrl').value||''); });
+    on('importUrl','click', function(){ smartExtract(el('brandUrl').value||''); });
   on('exportZip','click', exportZip);
   on('exportZipTop','click', exportZip);
+  on('animPlay','click', function(){ applyPreviewAnim(); });
   on('undoBtn','click', function(){ undo(); });
   on('redoBtn','click', function(){ redo(); });
   on('resetPos','click', function(){ pushHist(); resetPositions(); });

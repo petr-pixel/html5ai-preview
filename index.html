@@ -49,7 +49,7 @@
           <label>Velikost</label><input id="hSize" type="number" value="28" min="8" max="120">
           <label>Barva</label><input id="hColor" type="color" value="#ffffff">
           <label>Font</label>
-          <select id="hFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select>
+          <select id="hFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select><button id="animPlay" class="btn ghost" style="padding:6px 10px">Play</button></div>
         </div>
         <div class="card">
           <div class="mini">Subline</div>
@@ -67,10 +67,7 @@
           <select id="cFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select>
         </div>
       </div>
-      <label>Vlastní font (WOFF/WOFF2, volitelné — vloží se inline)</label>
-      <input id="fontFile" type="file" accept=".woff,.woff2">
-
-      <label class="mt">Pozadí (CSS)</label>
+            <label class="mt">Pozadí (CSS)</label>
       <input id="bg" type="text" value="linear-gradient(180deg,#17324F,#0A1A2B)">
 
       <details class="mt">
@@ -105,7 +102,7 @@
       <div class="grid3">
         <div>
           <label>Preset</label>
-          <select id="animPreset">
+          <div class="row" style="gap:8px;align-items:center"><select id="animPreset">
             <option value="none">Žádná</option>
             <option value="fade">Fade</option>
             <option value="slideUp">Slide-up</option>
