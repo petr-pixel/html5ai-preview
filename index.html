@@ -1,74 +1,17 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>html5ai — preview & export</title>
-  <link rel="stylesheet" href="app.css" />
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="ad.size" content="width=300,height=250">
+  <meta name="productType" content="dynamic">
+  <meta name="vertical" content="RETAIL">
+  <meta name="responsive" content="true">
+  <title>html5ai</title>
+  <link rel="stylesheet" href="app.css">
 </head>
 <body>
-  <header class="hdr">
-    <div class="logoTitle">html5ai</div>
-    <div class="export-toolbar" role="toolbar">
-      <button class="btn" id="exportDisplayTop">Export Display (HTML5)</button>
-      <button class="btn primary" id="exportPmaxTop">Export P-Max (PNG)</button>
-      <button class="btn" id="exportPmaxHtmlTop">Export P-Max HTML5</button>
-    </div>
-  </header>
-
-  <main class="wrap">
-    <aside class="left">
-      <div class="card">
-        <div class="title">Vstup</div>
-        <label>URL (clickTag)
-          <input id="clickUrl" type="url" value="https://www.html5ai.cz/"/>
-        </label>
-        <label>Headline <input id="headline" type="text" value="Teplo do mrazu"/></label>
-        <label>Subline <input id="subline" type="text" value="Funkční vrstvy 24/7"/></label>
-        <label>CTA <input id="cta" type="text" value="Zjistit více"/></label>
-      </div>
-
-      <div class="card">
-        <div class="title">Assets</div>
-        <label>Logo <input id="logoFile" type="file" accept="image/*"/></label>
-        <label>Pozadí <input id="bgFile" type="file" accept="image/*"/></label>
-        <div class="grid3">
-          <label>H barva <input id="hColor" type="color" value="#ffffff"/></label>
-          <label>S barva <input id="sColor" type="color" value="#cfe6ff"/></label>
-          <label>CTA txt <input id="cTextColor" type="color" value="#061123"/></label>
-        </div>
-        <label>CTA pozadí <input id="cBgColor" type="color" value="#E4572E"/></label>
-      </div>
-
-      <div class="card">
-        <div class="title">Rozměry</div>
-        <div id="sizes" class="sizes"></div>
-      </div>
-
-      <div class="card">
-        <label><input type="checkbox" id="strictExport"/> Strict export</label>
-        <div class="small-hint">P-Max HTML5: ≤ 600 kB/ad (auto komprese). P-Max PNG: JPG výstup v Strict.</div>
-      </div>
-
-      <div class="card">
-        <div class="title">Export</div>
-        <div class="row" style="gap:8px;justify-content:flex-end">
-          <button class="btn" id="exportDisplay">Export Display (HTML5)</button>
-          <button class="btn primary" id="exportPmax">Export P-Max (PNG)</button>
-          <button class="btn" id="exportPmaxHtml">Export P-Max HTML5</button>
-        </div>
-      </div>
-    </aside>
-
-    <section class="previewCol">
-      <div class="title">Live preview</div>
-      <div id="preview" class="gridPreview"></div>
-      <div id="previewWide" class="gridPreview wide"></div>
-    </section>
-  </main>
-
+  <div id="app"></div>
   <script src="app.js"></script>
 </body>
 </html>
