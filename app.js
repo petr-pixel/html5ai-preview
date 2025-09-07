@@ -34,7 +34,7 @@
     var H=el('headline').value||''; var S=el('subline').value||''; var C=el('cta').value||'';
     var hSize=parseInt(el('hSize').value,10)||28; var sSize=parseInt(el('sSize').value,10)||16; var cSize=parseInt(el('cSize').value,10)||16;
     var hColor=el('hColor').value; var sColor=el('sColor').value; var cTxt=el('cTextColor').value; var cBg=el('cBgColor').value;
-    var bgCss=el('bg').value||'linear-gradient(180deg,#17324F,#0A1A2B)';
+    var bgCss='linear-gradient(180deg,#17324F,#0A1A2B)';
     activeSizes().forEach(function(s){
       var card=document.createElement('div'); card.className='previewCard';
       var head=document.createElement('div'); head.className='mini'; head.textContent=s.key; card.appendChild(head);

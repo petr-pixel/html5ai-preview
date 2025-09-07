@@ -17,3 +17,11 @@ label{display:block;font-size:12px;margin:10px 0 4px;color:#8aa0c7}input,select{
 .banner .cta{position:absolute;left:50%;top:75%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:20px;font-weight:700}
 .badge.ok{background:#143928;color:#bfe9d0;border:1px solid #1e5b3f;padding:10px;border-radius:10px;display:inline-block}
 /* Animations CSS, generated dynamically but classes kept simple */
+
+/* Uniform controls */
+input,select{height:42px;line-height:42px;padding:0 12px}
+.btn{height:42px}
+label{margin:8px 0 6px}
+
+.sizes{display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:6px}
+@media(max-width:900px){.sizes{grid-template-columns:1fr}}
