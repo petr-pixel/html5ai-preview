@@ -8,15 +8,31 @@
 </head>
 <body>
 <header class="hdr">
+  
   <div class="bar">
-    <div class="brand"><div class="logo">AI</div><div><strong>html5ai</strong><div class="tag">AI HTML5 banners • live preview & specs</div></div></div>
-    <div class="row">
-      <button class="btn ghost" id="newProject">Nový projekt</button>
-      
-      <label class="pill" style="gap:6px"><input id="strictExport" type="checkbox"> Strict export ≤150&nbsp;kB</label>
-      <button class="btn primary" id="exportZipTop">Export HTML5</button>
+    <div class="brand" aria-label="html5ai">
+      <div class="logo" aria-hidden="true">AI</div>
+      <div><strong>html5ai</strong><div class="tag">AI HTML5 banners • live preview &amp; specs</div></div>
     </div>
+    <nav class="menu" aria-label="Hlavní ovládání">
+      <div class="menu-group">
+        <button class="btn ghost" id="newProject" aria-label="Nový projekt">Nový projekt</button>
+      </div>
+      <div class="menu-div"></div>
+      <div class="menu-group">
+        <button class="btn ghost" id="animToggleHdr" aria-label="Přehrát/Pozastavit náhledy">Play</button>
+        <button class="btn ghost" id="replayAll" aria-label="Přehrát znovu animace">Replay</button>
+      </div>
+      <div class="menu-div"></div>
+      <div class="menu-group">
+        <label class="pill" style="gap:6px" title="Doporučení Google/DV360: celkový ZIP do 150 kB, bez externích zdrojů.">
+          <input id="strictExport" type="checkbox" aria-label="Strict export do 150 kB"> Strict export ≤150&nbsp;kB
+        </label>
+        <button class="btn primary" id="exportZipTop" aria-label="Exportovat HTML5 ZIP">Export HTML5</button>
+      </div>
+    </nav>
   </div>
+
 </header>
 
 <div class="wrap">
@@ -68,14 +84,22 @@
       </div>
 
       
+      
       <div class="title mt">Rozměry</div>
       <div id="sizes" class="sizes">
         <label><input type="checkbox" data-size="300x250" checked> 300×250</label>
-        <label><input type="checkbox" data-size="336x280"> 336×280</label>
-        <label><input type="checkbox" data-size="300x600"> 300×600</label>
-        <label><input type="checkbox" data-size="728x90"> 728×90</label>
-        <label><input type="checkbox" data-size="970x90"> 970×90</label>
+        <label><input type="checkbox" data-size="320x50"> 320×50</label>
+        <label><input type="checkbox" data-size="320x100"> 320×100</label>
+        <label><input type="checkbox" data-size="250x250"> 250×250</label>
+        <label><input type="checkbox" data-size="200x200"> 200×200</label>
+
+        <label><input type="checkbox" data-size="336x280" checked> 336×280</label>
+        <label><input type="checkbox" data-size="728x90" checked> 728×90</label>
+        <label><input type="checkbox" data-size="970x90" checked> 970×90</label>
+        <label><input type="checkbox" data-size="160x600" checked> 160×600</label>
+        <label><input type="checkbox" data-size="300x600" checked> 300×600</label>
       </div>
+
 
       <div class="title mt">Animace</div>
       <div class="grid3">
@@ -114,6 +138,7 @@
         <div class="pill">Klikni & táhni: BG, logo, headline, subline, CTA • <button id="replayAll" class="btn ghost" style="padding:4px 8px">Replay</button></div>
       </div>
       <div id="preview" class="previewGrid"></div>
+      <div id="previewWide" class="previewGrid wide"></div>
       <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn primary" id="exportZip">Export HTML5</button></div>
     </section>
   </main>

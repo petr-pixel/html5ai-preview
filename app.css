@@ -25,3 +25,14 @@ label{margin:8px 0 6px}
 
 .sizes{display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:6px}
 @media(max-width:900px){.sizes{grid-template-columns:1fr}}
+
+.previewGrid.wide{grid-template-columns:1fr}
+.previewGrid.wide .previewCard{max-width:970px;margin:0 auto}
+
+
+.menu{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.menu-group{display:flex;gap:8px;align-items:center}
+.menu-div{width:1px;height:28px;background:rgba(255,255,255,.08);border-radius:1px}
+.btn:focus-visible, .pill:focus-within{outline:2px solid #27c2a7; outline-offset:2px}
+.hdr{box-shadow:0 2px 0 rgba(0,0,0,.2)}
+

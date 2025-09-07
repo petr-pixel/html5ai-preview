@@ -1,6 +1,6 @@
 (function(){
   // --- sizes
-  var SIZES=[{key:'300x250',w:300,h:250},{key:'336x280',w:336,h:280},{key:'300x600',w:300,h:600},{key:'728x90',w:728,h:90},{key:'970x90',w:970,h:90}];
+  var SIZES=[{key:'300x250',w:300,h:250},{key:'320x50',w:320,h:50},{key:'320x100',w:320,h:100},{key:'250x250',w:250,h:250},{key:'200x200',w:200,h:200},{key:'336x280',w:336,h:280},{key:'728x90',w:728,h:90},{key:'970x90',w:970,h:90},{key:'160x600',w:160,h:600},{key:'300x600',w:300,h:600}];
   function el(id){ return document.getElementById(id); }
   function px(n){ return n+'px'; }
   function activeSizes(){
@@ -29,8 +29,10 @@
     if(!style){ style=document.createElement('style'); style.id='animStyle'; document.head.appendChild(style); }
     style.textContent = presetCss(el('animPreset').value, el('animDur').value);
   }
+  function isWide(key){ return ['728x90','970x90','320x50','320x100'].includes(key); }
   function render(){
     var grid=el('preview'); grid.innerHTML='';
+    var gridWide=el('previewWide'); if(gridWide) gridWide.innerHTML='';
     var H=el('headline').value||''; var S=el('subline').value||''; var C=el('cta').value||'';
     var hSize=parseInt(el('hSize').value,10)||28; var sSize=parseInt(el('sSize').value,10)||16; var cSize=parseInt(el('cSize').value,10)||16;
     var hColor=el('hColor').value; var sColor=el('sColor').value; var cTxt=el('cTextColor').value; var cBg=el('cBgColor').value;
@@ -43,13 +45,13 @@
       var hl=document.createElement('div'); hl.className='headline'; hl.textContent=H; hl.style.color=hColor; hl.style.fontSize=px(hSize); banner.appendChild(hl);
       var sl=document.createElement('div'); sl.className='subline'; sl.textContent=S; sl.style.color=sColor; sl.style.fontSize=px(sSize); banner.appendChild(sl);
       var ct=document.createElement('div'); ct.className='cta'; ct.textContent=C; ct.style.color=cTxt; ct.style.background=cBg; ct.style.fontSize=px(cSize); banner.appendChild(ct);
-      grid.appendChild(card);
+      if(isWide(s.key) && gridWide){ gridWide.appendChild(card); } else { grid.appendChild(card); }
     });
     ensureAnimStyle();
     pauseAnimations(); // default = static
   }
-  function playAnimations(){ isPlaying=true; animNodes().forEach(n=> n.style.animationPlayState='running'); var t=el('animToggle'); if(t) t.textContent='Pause'; }
-  function pauseAnimations(){ isPlaying=false; animNodes().forEach(n=> n.style.animationPlayState='paused'); var t=el('animToggle'); if(t) t.textContent='Play'; }
+  function playAnimations(){ isPlaying=true; animNodes().forEach(n=> n.style.animationPlayState='running'); var t=el('animToggle'); if(t) t.textContent='Pause'; var h=document.getElementById('animToggleHdr'); if(h) h.textContent='Pause'; }
+  function pauseAnimations(){ isPlaying=false; animNodes().forEach(n=> n.style.animationPlayState='paused'); var t=el('animToggle'); if(t) t.textContent='Play'; var h=document.getElementById('animToggleHdr'); if(h) h.textContent='Play'; }
   function resetAnimations(){
     var nodes=animNodes(); nodes.forEach(n=>{ n.style.animation='none'; n.style.animationPlayState='paused'; n.style.animationIterationCount=''; });
     void document.body.offsetWidth;
@@ -66,6 +68,11 @@
   el('animDur').addEventListener('change', function(){ ensureAnimStyle(); resetAnimations(); });
   el('animLoops').addEventListener('change', function(){ resetAnimations(); });
   el('animToggle').addEventListener('click', function(){ if(isPlaying) pauseAnimations(); else { ensureAnimStyle(); resetAnimations(); playAnimations(); } });
+  var hdrBtn = document.getElementById('animToggleHdr');
+  if(hdrBtn){ hdrBtn.addEventListener('click', function(){ if(isPlaying) pauseAnimations(); else { ensureAnimStyle(); resetAnimations(); playAnimations(); } }); }
+  var replay = document.getElementById('replayAll');
+  if(replay){ replay.addEventListener('click', function(){ ensureAnimStyle(); resetAnimations(); if(isPlaying) playAnimations(); }); }
+
 
   document.addEventListener('DOMContentLoaded', function(){ render(); });
 })();
