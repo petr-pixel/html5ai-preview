@@ -1,17 +1,144 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="ad.size" content="width=300,height=250">
-  <meta name="productType" content="dynamic">
-  <meta name="vertical" content="RETAIL">
-  <meta name="responsive" content="true">
-  <title>html5ai</title>
-  <link rel="stylesheet" href="app.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>html5ai — live animations build</title>
+  <link rel="stylesheet" href="app.css" />
 </head>
 <body>
-  <div id="app"></div>
-  <script src="app.js"></script>
+<header class="hdr">
+  <div class="bar">
+    <div class="brand"><div class="logo">AI</div><div><strong>html5ai</strong><div class="tag">AI HTML5 banners • live preview & specs</div></div></div>
+    <div class="row">
+      <button class="btn ghost" id="newProject">Nový projekt</button>
+      <button class="btn" id="importUrl">Extract z URL</button>
+      <label class="pill" style="gap:6px"><input id="strictExport" type="checkbox"> Strict export ≤150&nbsp;kB</label>
+      <button class="btn primary" id="exportZipTop">Export HTML5</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <main class="grid">
+    <section class="panel">
+      <div class="title">Krok 1 — Vstup</div>
+      <label>URL (clickTag / seed barev)</label>
+      <input id="brandUrl" type="url" placeholder="https://www.tvujweb.cz">
+
+      <div class="grid2">
+        <div><label>Headline</label><input id="headline" type="text" value="Teplo do mrazu"></div>
+        <div><label>Subline</label><input id="subline" type="text" value="Funkční vrstvy 24/7"></div>
+      </div>
+      <div class="grid2">
+        <div><label>CTA</label><input id="cta" type="text" value="Zjistit více"></div>
+        <div><label>Click URL</label><input id="clickUrl" type="url" value="https://www.html5ai.cz/"></div>
+      </div>
+
+      <div class="title mt">Krok 2 — Assets</div>
+      <div class="grid2">
+        <div><label>Logo (URL / upload)</label><input id="logoUrl" type="url" placeholder="https://...logo.png"><input id="logoFile" type="file" accept="image/*"></div>
+        <div><label>Pozadí / produkt (URL / upload)</label><input id="bgUrl" type="url" placeholder="https://...image.jpg"><input id="bgFile" type="file" accept="image/*"></div>
+      </div>
+
+      <div class="title mt">Typografie & barvy</div>
+      <div class="grid3">
+        <div class="card">
+          <div class="mini">Headline</div>
+          <label>Velikost</label><input id="hSize" type="number" value="28" min="8" max="120">
+          <label>Barva</label><input id="hColor" type="color" value="#ffffff">
+          <label>Font</label>
+          <select id="hFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select>
+        </div>
+        <div class="card">
+          <div class="mini">Subline</div>
+          <label>Velikost</label><input id="sSize" type="number" value="16" min="8" max="120">
+          <label>Barva</label><input id="sColor" type="color" value="#cfe3ff">
+          <label>Font</label>
+          <select id="sFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select>
+        </div>
+        <div class="card">
+          <div class="mini">CTA</div>
+          <label>Velikost</label><input id="cSize" type="number" value="16" min="8" max="120">
+          <label>Text barva</label><input id="cTextColor" type="color" value="#061123">
+          <label>Pozadí</label><input id="cBgColor" type="color" value="#E4572E">
+          <label>Font</label>
+          <select id="cFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select>
+        </div>
+      </div>
+      <label>Vlastní font (WOFF/WOFF2, volitelné — vloží se inline)</label>
+      <input id="fontFile" type="file" accept=".woff,.woff2">
+
+      <label class="mt">Pozadí (CSS)</label>
+      <input id="bg" type="text" value="linear-gradient(180deg,#17324F,#0A1A2B)">
+
+      <details class="mt">
+        <summary>Per-formát pozice (BG, Logo, Texty & CTA)</summary>
+        <div id="perSize"></div>
+      </details>
+
+      <div class="title mt">AI Copy</div>
+      <div id="aiPanel" class="aiPanel">
+        <div class="row">
+          <input id="kw" type="text" placeholder="Klíčová slova (např. zimní bunda, nepromokavá, sleva 30 %)">
+          <button id="genKw" class="btn">+ Vytvořit z KW</button>
+        </div>
+        <div id="variants" class="variants"></div>
+      </div>
+
+      <div class="title mt">Rozměry</div>
+      <div id="sizes" class="sizes">
+        <label><input type="checkbox" data-size="300x250" checked> 300×250</label>
+        <label><input type="checkbox" data-size="320x50"> 320×50</label>
+        <label><input type="checkbox" data-size="320x100"> 320×100</label>
+        <label><input type="checkbox" data-size="250x250"> 250×250</label>
+        <label><input type="checkbox" data-size="200x200"> 200×200</label>
+        <label><input type="checkbox" data-size="336x280"> 336×280</label>
+        <label><input type="checkbox" data-size="728x90"> 728×90</label>
+        <label><input type="checkbox" data-size="970x90"> 970×90</label>
+        <label><input type="checkbox" data-size="160x600"> 160×600</label>
+        <label><input type="checkbox" data-size="300x600" checked> 300×600</label>
+      </div>
+
+      <div class="title mt">Animace</div>
+      <div class="grid3">
+        <div>
+          <label>Preset</label>
+          <select id="animPreset">
+            <option value="none">Žádná</option>
+            <option value="fade">Fade</option>
+            <option value="slideUp">Slide-up</option>
+            <option value="slideSide">Slide-side</option>
+            <option value="pop">Pop-in</option>
+            <option value="combo">Combo</option>
+          </select>
+        </div>
+        <div>
+          <label>Délka jedné sekvence</label>
+          <select id="animDur"><option>1.5</option><option selected>2</option><option>3</option></select>
+        </div>
+        <div>
+          <label>Počet loopů (max 3)</label>
+          <select id="animLoops"><option>1</option><option>2</option><option selected>3</option></select>
+        </div>
+      </div>
+
+      <div class="title mt">Validator</div>
+      <div id="badge" class="badge ok">OK — připraveno k exportu</div>
+      <ul id="issues" class="mini list"></ul>
+    </section>
+
+    <section class="panel">
+      <div class="row space">
+        <div class="title">Live preview</div>
+        <div class="pill">Klikni & táhni: BG, logo, headline, subline, CTA • <button id="replayAll" class="btn ghost" style="padding:4px 8px">Replay</button></div>
+      </div>
+      <div id="preview" class="previewGrid"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn primary" id="exportZip">Export HTML5</button></div>
+    </section>
+  </main>
+  <footer>© 2025 html5ai — live preview build (CSP-safe, no external CDN)</footer>
+</div>
+<script src="app.js" defer></script>
 </body>
 </html>
