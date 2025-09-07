@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>html5ai — live animations build</title>
+  <title>html5ai — extract fix (bez AI Copy)</title>
   <link rel="stylesheet" href="app.css" />
 </head>
 <body>
 <header class="hdr">
   <div class="bar">
-    <div class="brand"><div class="logo">AI</div><div><strong>html5ai</strong><div class="tag">AI HTML5 banners • live preview & specs</div></div></div>
+    <div class="brand"><div class="logo">AI</div><div><strong>html5ai</strong><div class="tag">HTML5 banners • live preview</div></div></div>
     <div class="row">
-      <button class="btn ghost" id="newProject">Nový projekt</button>
       <button class="btn" id="importUrl">Extract z URL</button>
+      <span id="extractStatus" class="pill" style="display:none"></span>
       <label class="pill" style="gap:6px"><input id="strictExport" type="checkbox"> Strict export ≤150&nbsp;kB</label>
       <button class="btn primary" id="exportZipTop">Export HTML5</button>
     </div>
@@ -22,7 +22,7 @@
 <div class="wrap">
   <main class="grid">
     <section class="panel">
-      <div class="title">Krok 1 — Vstup</div>
+      <div class="title">Vstup</div>
       <label>URL (clickTag / seed barev)</label>
       <input id="brandUrl" type="url" placeholder="https://www.tvujweb.cz">
 
@@ -35,7 +35,7 @@
         <div><label>Click URL</label><input id="clickUrl" type="url" value="https://www.html5ai.cz/"></div>
       </div>
 
-      <div class="title mt">Krok 2 — Assets</div>
+      <div class="title mt">Assets</div>
       <div class="grid2">
         <div><label>Logo (URL / upload)</label><input id="logoUrl" type="url" placeholder="https://...logo.png"><input id="logoFile" type="file" accept="image/*"></div>
         <div><label>Pozadí / produkt (URL / upload)</label><input id="bgUrl" type="url" placeholder="https://...image.jpg"><input id="bgFile" type="file" accept="image/*"></div>
@@ -76,15 +76,6 @@
         <summary>Per-formát pozice (BG, Logo, Texty & CTA)</summary>
         <div id="perSize"></div>
       </details>
-
-      <div class="title mt">AI Copy</div>
-      <div id="aiPanel" class="aiPanel">
-        <div class="row">
-          <input id="kw" type="text" placeholder="Klíčová slova (např. zimní bunda, nepromokavá, sleva 30 %)">
-          <button id="genKw" class="btn">+ Vytvořit z KW</button>
-        </div>
-        <div id="variants" class="variants"></div>
-      </div>
 
       <div class="title mt">Rozměry</div>
       <div id="sizes" class="sizes">
@@ -131,13 +122,13 @@
     <section class="panel">
       <div class="row space">
         <div class="title">Live preview</div>
-        <div class="pill">Klikni & táhni: BG, logo, headline, subline, CTA • <button id="replayAll" class="btn ghost" style="padding:4px 8px">Replay</button></div>
+        <div class="pill">Klikni & táhni • <button id="replayAll" class="btn ghost" style="padding:4px 8px">Replay</button></div>
       </div>
       <div id="preview" class="previewGrid"></div>
       <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn primary" id="exportZip">Export HTML5</button></div>
     </section>
   </main>
-  <footer>© 2025 html5ai — live preview build (CSP-safe, no external CDN)</footer>
+  <footer>© 2025 html5ai — extract fix build (bez AI Copy, CSP-safe)</footer>
 </div>
 <script src="app.js" defer></script>
 </body>

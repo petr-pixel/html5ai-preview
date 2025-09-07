@@ -45,6 +45,3 @@ input[type=file]{width:100%}
 footer{color:#7e8fb5;text-align:center;margin:30px 0}.mini{font-size:12px;color:#93a2c8}
 .list{margin:8px 0 0 18px}
 .mt{margin-top:18px}
-.variants{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}
-.vcard{background:#0e1935;border:1px solid var(--border);border-radius:12px;padding:10px}
-.vcard .row{justify-content:flex-end}
