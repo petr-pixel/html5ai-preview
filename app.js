@@ -106,140 +106,21 @@ var saveAs = saveAs || (function(view) {
     var H=el('headline').value||''; var S=el('subline').value||''; var C=el('cta').value||'';
     var hColor=el('hColor').value; var sColor=el('sColor').value; var cTxt=el('cTextColor').value; var cBg=el('cBgColor').value;
 
-    activeSizes().forEach(function(s){
-      var st=state[s.key];
-      st.logoUrl = el('logoUrl').value||st.logoUrl;
-      st.bgUrl = el('bgUrl').value||st.bgUrl;
-
-      var card=document.createElement('div'); card.className='previewCard';
-      var head=document.createElement('div'); head.className='mini'; head.textContent=s.key; card.appendChild(head);
-      var canvas=document.createElement('div'); canvas.className='canvas'; canvas.style.width=px(s.w); canvas.style.height=px(s.h); card.appendChild(canvas);
-      var banner=document.createElement('div'); banner.className='banner'; banner.dataset.sizeKey=s.key; banner.style.background= st.bgUrl ? ('url(\"'+st.bgUrl+'\") center/cover') : 'linear-gradient(180deg,#17324F,#0A1A2B)'; canvas.appendChild(banner);
-
-      if(st.logoUrl){ var li=document.createElement('img'); li.className='logoImg'; li.src=st.logoUrl; li.style.transform='translate('+st.logoX+'px,'+st.logoY+'px) scale('+st.logoScale+')'; li.dataset.type='logo'; banner.appendChild(li); }
-
-      var hl=document.createElement('div'); hl.className='headline'; hl.textContent=H; hl.style.color=hColor; hl.style.fontSize=px(st.h.size||28); hl.style.transform='translate(calc(-50% + '+(st.h.x||0)+'px), calc(-50% + '+(st.h.y||0)+'px))'; hl.dataset.type='h'; banner.appendChild(hl);
-      var sl=document.createElement('div'); sl.className='subline'; sl.textContent=S; sl.style.color=sColor; sl.style.fontSize=px(st.s.size||16); sl.style.transform='translate(calc(-50% + '+(st.s.x||0)+'px), calc(-50% + '+(st.s.y||0)+'px))'; sl.dataset.type='s'; banner.appendChild(sl);
-      var ct=document.createElement('div'); ct.className='cta'; ct.textContent=C; ct.style.color=cTxt; ct.style.background=cBg; ct.style.fontSize=px(st.c.size||16); ct.style.transform='translate(calc(-50% + '+(st.c.x||0)+'px), calc(-50% + '+(st.c.y||0)+'px))'; ct.dataset.type='c'; banner.appendChild(ct);
-
-      if(isWide(s.key) && gridWide){ gridWide.appendChild(card); } else { grid.appendChild(card); }
-    });
-
-    applyPreviewAnim();
-    renderPerSize();
-    validate();
-  }
-
-  // Dragging
-  var dragging=null;
-  function onDragStart(e){
-    var t=e.target;
-    var banner=t.closest('.banner'); if(!banner) return;
-    var key=banner.dataset.sizeKey;
-    var st=state[key];
-    var type=t.dataset.type;
-    if(!type){ type='bg'; }
-    dragging={key:key,type:type, startX:e.clientX, startY:e.clientY, el:t};
-    e.preventDefault();
-  }
-  function onDragMove(e){
-    if(!dragging) return;
-    var dx=e.clientX-dragging.startX, dy=e.clientY-dragging.startY;
-    var st=state[dragging.key];
-    if(dragging.type==='h'){ st.h.x += dx; st.h.y += dy; }
-    else if(dragging.type==='s'){ st.s.x += dx; st.s.y += dy; }
-    else if(dragging.type==='c'){ st.c.x += dx; st.c.y += dy; }
-    else if(dragging.type==='logo'){ st.logoX += dx; st.logoY += dy; }
-    else if(dragging.type==='bg'){ st.bgX += dx; st.bgY += dy; }
-    dragging.startX=e.clientX; dragging.startY=e.clientY;
-    render();
-  }
-  function onDragEnd(){ dragging=null; }
-
-  document.addEventListener('pointerdown', function(e){
-    var t=e.target;
-    if(t.classList.contains('headline')||t.classList.contains('subline')||t.classList.contains('cta')){
-      t.dataset.type = t.classList.contains('headline')?'h': t.classList.contains('subline')?'s':'c';
-      onDragStart(e);
-    }else if(t.classList.contains('logoImg')){ t.dataset.type='logo'; onDragStart(e); }
-    else if(t.closest('.banner')){ onDragStart(e); }
-  });
-  document.addEventListener('pointermove', onDragMove);
-  document.addEventListener('pointerup', onDragEnd);
-
-  // Double click reset
-  document.addEventListener('dblclick', function(e){
-    var b=e.target.closest('.banner'); if(!b) return;
-    var st=state[b.dataset.sizeKey];
-    if(e.target.classList.contains('headline')) st.h={x:0,y:0,size:28};
-    else if(e.target.classList.contains('subline')) st.s={x:0,y:0,size:16};
-    else if(e.target.classList.contains('cta')) st.c={x:0,y:0,size:16};
-    else if(e.target.classList.contains('logoImg')){ st.logoX=0; st.logoY=0; st.logoScale=1; }
-    else { st.bgX=0; st.bgY=0; st.bgScale=1; }
-    render();
-  });
-
-  // Per-size sliders
-  function perSizeRow(key, st){
-    var wrap=document.createElement('div'); wrap.className='card';
-    wrap.innerHTML = '<div class="mini" style="margin-bottom:6px">'+key+'</div>\
-      <div class="per-size">\
-        <div class="row">Logo: X <input type="range" min="-200" max="200" value="'+st.logoX+'" data-k="'+key+'" data-f="logoX"> Y <input type="range" min="-200" max="200" value="'+st.logoY+'" data-k="'+key+'" data-f="logoY"> Scale <input type="range" min="0.2" max="3" step="0.05" value="'+st.logoScale+'" data-k="'+key+'" data-f="logoScale"></div>\
-        <div class="row">BG: X <input type="range" min="-300" max="300" value="'+st.bgX+'" data-k="'+key+'" data-f="bgX"> Y <input type="range" min="-300" max="300" value="'+st.bgY+'" data-k="'+key+'" data-f="bgY"> Scale <input type="range" min="0.2" max="3" step="0.05" value="'+st.bgScale+'" data-k="'+key+'" data-f="bgScale"></div>\
-        <div class="row">H: X <input type="range" min="-300" max="300" value="'+(st.h.x||0)+'" data-k="'+key+'" data-f="h.x"> Y <input type="range" min="-300" max="300" value="'+(st.h.y||0)+'" data-k="'+key+'" data-f="h.y"> Size <input type="range" min="10" max="80" value="'+(st.h.size||28)+'" data-k="'+key+'" data-f="h.size"></div>\
-        <div class="row">S: X <input type="range" min="-300" max="300" value="'+(st.s.x||0)+'" data-k="'+key+'" data-f="s.x"> Y <input type="range" min="-300" max="300" value="'+(st.s.y||0)+'" data-k="'+key+'" data-f="s.y"> Size <input type="range" min="8" max="60" value="'+(st.s.size||16)+'" data-k="'+key+'" data-f="s.size"></div>\
-        <div class="row">CTA: X <input type="range" min="-300" max="300" value="'+(st.c.x||0)+'" data-k="'+key+'" data-f="c.x"> Y <input type="range" min="-300" max="300" value="'+(st.c.y||0)+'" data-k="'+key+'" data-f="c.y"> Size <input type="range" min="10" max="60" value="'+(st.c.size||16)+'" data-k="'+key+'" data-f="c.size"></div>\
-      </div>';
-    return wrap;
-  }
-  function renderPerSize(){
-    var box=el('perSize'); box.innerHTML='';
-    activeSizes().forEach(function(s){ box.appendChild(perSizeRow(s.key, state[s.key])); });
-    box.querySelectorAll('input[type=range]').forEach(function(r){
-      r.addEventListener('input', function(){
-        var k=this.dataset.k, f=this.dataset.f, st=state[k];
-        if(f==='logoX') st.logoX=parseFloat(this.value);
-        else if(f==='logoY') st.logoY=parseFloat(this.value);
-        else if(f==='logoScale') st.logoScale=parseFloat(this.value);
-        else if(f==='bgX') st.bgX=parseFloat(this.value);
-        else if(f==='bgY') st.bgY=parseFloat(this.value);
-        else if(f==='bgScale') st.bgScale=parseFloat(this.value);
-        else if(f==='h.x') st.h.x=parseFloat(this.value);
-        else if(f==='h.y') st.h.y=parseFloat(this.value);
-        else if(f==='h.size') st.h.size=parseFloat(this.value);
-        else if(f==='s.x') st.s.x=parseFloat(this.value);
-        else if(f==='s.y') st.s.y=parseFloat(this.value);
-        else if(f==='s.size') st.s.size=parseFloat(this.value);
-        else if(f==='c.x') st.c.x=parseFloat(this.value);
-        else if(f==='c.y') st.c.y=parseFloat(this.value);
-        else if(f==='c.size') st.c.size=parseFloat(this.value);
-        render();
-      });
-    });
-  }
-
-  // Uploads
-  var lf=document.getElementById('logoFile'); if(lf){ lf.addEventListener('change', async function(e){ var f=e.target.files&&e.target.files[0]; if(!f) return; try{ var d=await readFileAsDataURL(f); var u=document.getElementById('logoUrl'); if(u){ u.value=d; render(); } }catch(_){}}); }
-  var bf=document.getElementById('bgFile'); if(bf){ bf.addEventListener('change', async function(e){ var f=e.target.files&&e.target.files[0]; if(!f) return; try{ var d=await readFileAsDataURL(f); var u=document.getElementById('bgUrl'); if(u){ u.value=d; render(); } }catch(_){}}); }
-  var lu=document.getElementById('logoUrl'); if(lu){ lu.addEventListener('input', render); }
-  var bu=document.getElementById('bgUrl'); if(bu){ bu.addEventListener('input', render); }
-
-  // Anim controls
-  document.getElementById('animToggle').addEventListener('click', function(){ if(isPlaying) pauseAnimations(); else { applyPreviewAnim(); playAnimations(); } });
-  var hdrBtn=document.getElementById('animToggleHdr'); if(hdrBtn){ hdrBtn.addEventListener('click', function(){ if(isPlaying) pauseAnimations(); else { applyPreviewAnim(); playAnimations(); } }); }
-  var replay=document.getElementById('replayAll'); if(replay){ replay.addEventListener('click', function(){ applyPreviewAnim(); if(isPlaying) playAnimations(); }); }
-  document.getElementById('animPreset').addEventListener('change', function(){ applyPreviewAnim(); });
-  document.getElementById('animDur').addEventListener('change', function(){ applyPreviewAnim(); });
-  document.getElementById('animLoops').addEventListener('change', function(){ applyPreviewAnim(); });
-
-  // Export ZIP (single zip, all sizes)
-  function exportZip(){
-    var clickUrl = el('clickUrl').value || 'https://example.com';
-    var zip = new JSZip();
-
-    activeSizes().forEach(function(s){
+    for (const s of activeSizes()){
       var st=state[s.key];
       var folder=zip.folder(s.key);
+
+      // Prepare assets (compress if data URLs)
+      var q = strict ? 0.65 : 0.8;
+      var bgUrlOut = st.bgUrl;
+      var logoUrlOut = st.logoUrl;
+      if(isDataUrl(st.bgUrl)){
+        try{ bgUrlOut = await compressDataUrl(st.bgUrl, {maxW: s.w*2, maxH: s.h*2, mime:'image/jpeg', quality:q}); }catch(_){}
+      }
+      if(isDataUrl(st.logoUrl)){
+        try{ logoUrlOut = await compressDataUrl(st.logoUrl, {maxW: Math.round(s.w*0.6), maxH: Math.round(s.h*0.6), mime:'image/png', quality:0.82}); }catch(_){}
+      }
+
       var html = `<!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -249,7 +130,7 @@ var saveAs = saveAs || (function(view) {
   <title>${s.key}</title>
   <style>
     html,body{margin:0;padding:0}
-    .wrap{position:relative;width:${s.w}px;height:${s.h}px;overflow:hidden;background:${st.bgUrl?'url('+st.bgUrl+') center/cover':'linear-gradient(180deg,#17324F,#0A1A2B)'};font-family:Arial,Helvetica,sans-serif;color:#fff}
+    .wrap{position:relative;width=${s.w}px;height=${s.h}px;overflow:hidden;background:${bgUrlOut?('url('+bgUrlOut+') center/cover'):'linear-gradient(180deg,#17324F,#0A1A2B)'};font-family:Arial,Helvetica,sans-serif;color:#fff}
     .logo{position:absolute;left:0;top:0;transform:translate(${st.logoX}px,${st.logoY}px) scale(${st.logoScale});max-width:40%;max-height:40%}
     .h{position:absolute;left:50%;top:40%;transform:translate(calc(-50% + ${st.h.x}px), calc(-50% + ${st.h.y}px));color:${el('hColor').value};font-weight:800;font-size:${st.h.size||28}px;white-space:nowrap}
     .s{position:absolute;left:50%;top:55%;transform:translate(calc(-50% + ${st.s.x}px), calc(-50% + ${st.s.y}px));color:${el('sColor').value};font-weight:600;font-size:${st.s.size||16}px;white-space:nowrap}
@@ -259,20 +140,24 @@ var saveAs = saveAs || (function(view) {
 </head>
 <body>
   <div class="wrap">
-    ${st.logoUrl?'<img class="logo" src="'+st.logoUrl+'" alt="logo">':''}
+    ${logoUrlOut?'<img class="logo" src="'+logoUrlOut+'" alt="logo">':''}
     <div class="h">${escapeHtml(el('headline').value||'')}</div>
     <div class="s">${escapeHtml(el('subline').value||'')}</div>
     <div class="c">${escapeHtml(el('cta').value||'')}</div>
     <a class="click" href="javascript:window.open(window.clickTag)"></a>
   </div>
-  <script>window.clickTag="${clickUrl.replace('"','%22')}";</script>
+  <script>window.clickTag="${'${clickUrl}'.replace('"','%22')}";</script>
+  ${(!isDataUrl(st.bgUrl)&&st.bgUrl)?'<!-- POZOR: Externí BG URL; pro 100% validaci nahraj obrázek jako soubor, aby byl inline. -->':''}
 </body>
 </html>`;
+
       folder.file("index.html", html);
-    });
+      totalBytes += byteLen(html);
+    }
 
     zip.generateAsync({type:"blob"}).then(function(content){
-      saveAs(content, "ads_all_sizes_html5.zip");
+      var name = (totalBytes > 5*1024*1024) ? "ads_all_sizes_html5_OVER_5MB.zip" : "ads_all_sizes_html5.zip";
+      saveAs(content, name);
     });
   }
 
@@ -280,6 +165,7 @@ var saveAs = saveAs || (function(view) {
   function validate(){ var badge=el('badge'); badge.className='badge ok'; badge.textContent='OK — připraveno k exportu'; }
   function on(id,ev,fn){ var x=document.getElementById(id); if(x) x.addEventListener(ev,fn); }
   on('exportZip','click', exportZip); on('exportZipTop','click', exportZip);
+  on('perSizeToggle','click', function(){ var w=document.getElementById('perSizeWrapper'); var b=document.getElementById('perSizeToggle'); if(!w||!b) return; w.classList.toggle('is-hidden'); b.textContent = w.classList.contains('is-hidden') ? 'Ukázat panel' : 'Skrýt panel'; });
 
   document.addEventListener('DOMContentLoaded', function(){ render(); pauseAnimations(); }, false);
 

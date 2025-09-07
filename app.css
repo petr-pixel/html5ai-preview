@@ -26,3 +26,5 @@ label{display:block;font-size:12px;margin:8px 0 6px;color:#8aa0c7}input,select{w
 .per-size{display:grid;grid-template-columns:1fr;gap:8px}
 .per-size .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .per-size input[type=range]{width:120px}
+
+.is-hidden{display:none}
