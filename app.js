@@ -1,6 +1,6 @@
 (function(){
   // --- sizes
-  var SIZES=[{key:'300x250',w:300,h:250},{key:'320x50',w:320,h:50},{key:'320x100',w:320,h:100},{key:'250x250',w:250,h:250},{key:'200x200',w:200,h:200},{key:'336x280',w:336,h:280},{key:'728x90',w:728,h:90},{key:'970x90',w:970,h:90},{key:'160x600',w:160,h:600},{key:'300x600',w:300,h:600}];
+  var SIZES=[{key:'300x250',w:300,h:250},{key:'336x280',w:336,h:280},{key:'300x600',w:300,h:600},{key:'160x600',w:160,h:600},{key:'250x250',w:250,h:250},{key:'200x200',w:200,h:200},{key:'728x90',w:728,h:90},{key:'970x90',w:970,h:90},{key:'320x50',w:320,h:50},{key:'320x100',w:320,h:100}];
   function el(id){ return document.getElementById(id); }
   function px(n){ return n+'px'; }
   function activeSizes(){
@@ -30,18 +30,30 @@
     style.textContent = presetCss(el('animPreset').value, el('animDur').value);
   }
   function isWide(key){ return ['728x90','970x90','320x50','320x100'].includes(key); }
+
+  function readFileAsDataURL(file){
+    return new Promise(function(res, rej){
+      var fr = new FileReader();
+      fr.onload = function(){ res(fr.result); };
+      fr.onerror = function(){ rej(fr.error || new Error('read error')); };
+      fr.readAsDataURL(file);
+    });
+  }
+
   function render(){
     var grid=el('preview'); grid.innerHTML='';
     var gridWide=el('previewWide'); if(gridWide) gridWide.innerHTML='';
     var H=el('headline').value||''; var S=el('subline').value||''; var C=el('cta').value||'';
     var hSize=parseInt(el('hSize').value,10)||28; var sSize=parseInt(el('sSize').value,10)||16; var cSize=parseInt(el('cSize').value,10)||16;
     var hColor=el('hColor').value; var sColor=el('sColor').value; var cTxt=el('cTextColor').value; var cBg=el('cBgColor').value;
-    var bgCss='linear-gradient(180deg,#17324F,#0A1A2B)';
+    var bgUrl=(el('bgUrl')&&el('bgUrl').value)||''; var logoUrl=(el('logoUrl')&&el('logoUrl').value)||''; var bgCss=bgUrl?('url("'+bgUrl+'")'): 'linear-gradient(180deg,#17324F,#0A1A2B)';
     activeSizes().forEach(function(s){
       var card=document.createElement('div'); card.className='previewCard';
       var head=document.createElement('div'); head.className='mini'; head.textContent=s.key; card.appendChild(head);
       var canvas=document.createElement('div'); canvas.className='canvas'; canvas.style.width=px(s.w); canvas.style.height=px(s.h); card.appendChild(canvas);
       var banner=document.createElement('div'); banner.className='banner'; banner.style.background=bgCss; canvas.appendChild(banner);
+      if(logoUrl){ var li=document.createElement('img'); li.className='logoImg'; li.src=logoUrl; banner.appendChild(li); }
+      if(logoUrl){ var li=document.createElement('img'); li.className='logoImg'; li.src=logoUrl; banner.appendChild(li); }
       var hl=document.createElement('div'); hl.className='headline'; hl.textContent=H; hl.style.color=hColor; hl.style.fontSize=px(hSize); banner.appendChild(hl);
       var sl=document.createElement('div'); sl.className='subline'; sl.textContent=S; sl.style.color=sColor; sl.style.fontSize=px(sSize); banner.appendChild(sl);
       var ct=document.createElement('div'); ct.className='cta'; ct.textContent=C; ct.style.color=cTxt; ct.style.background=cBg; ct.style.fontSize=px(cSize); banner.appendChild(ct);
@@ -64,6 +76,22 @@
     var x=el(id); if(x) x.addEventListener('input', render);
   });
   document.querySelectorAll('#sizes input[type=checkbox]').forEach(function(cb){ cb.addEventListener('change', render); });
+
+  // ---- Upload handlers ----
+  var lf = document.getElementById('logoFile');
+  if(lf){ lf.addEventListener('change', async function(e){
+    var f=e.target.files && e.target.files[0]; if(!f) return;
+    try{ var data=await readFileAsDataURL(f); if(el('logoUrl')) el('logoUrl').value=data; render(); }catch(_){}
+  });}
+  var bf = document.getElementById('bgFile');
+  if(bf){ bf.addEventListener('change', async function(e){
+    var f=e.target.files && e.target.files[0]; if(!f) return;
+    try{ var data=await readFileAsDataURL(f); if(el('bgUrl')) el('bgUrl').value=data; render(); }catch(_){}
+  });}
+  // ---- URL input mirror ----
+  if(el('logoUrl')) el('logoUrl').addEventListener('input', render);
+  if(el('bgUrl')) el('bgUrl').addEventListener('input', render);
+
   el('animPreset').addEventListener('change', function(){ ensureAnimStyle(); resetAnimations(); });
   el('animDur').addEventListener('change', function(){ ensureAnimStyle(); resetAnimations(); });
   el('animLoops').addEventListener('change', function(){ resetAnimations(); });
