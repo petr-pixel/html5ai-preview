@@ -10,10 +10,10 @@
 <header class="hdr">
   <div class="bar">
     <div class="brand"><div class="logo">AI</div><div><strong>html5ai</strong><div class="tag">AI HTML5 banners • live preview & specs</div></div></div>
-    <div class="row"><button class="btn ghost" id="undoBtn" title="Zpět (undo)">⟲</button><button class="btn ghost" id="redoBtn" title="Znovu (redo)">⟳</button><button class="btn ghost" id="resetPos" title="Resetovat pozice a měřítka">Reset</button>
+    <div class="row">
       <button class="btn ghost" id="newProject">Nový projekt</button>
       <button class="btn" id="importUrl">Extract z URL</button>
-      <label class="pill" style="gap:6px" title="Google Ads/DV360 doporučení: celkový ZIP do 150 kB, inline assets."><input id="strictExport" type="checkbox"> Strict export ≤150&nbsp;kB</label>
+      <label class="pill" style="gap:6px"><input id="strictExport" type="checkbox"> Strict export ≤150&nbsp;kB</label>
       <button class="btn primary" id="exportZipTop">Export HTML5</button>
     </div>
   </div>
@@ -25,7 +25,6 @@
       <div class="title">Krok 1 — Vstup</div>
       <label>URL (clickTag / seed barev)</label>
       <input id="brandUrl" type="url" placeholder="https://www.tvujweb.cz">
-<div id="extractStatus" class="mini" style="margin-top:6px;color:#8aa0c7"></div>
 
       <div class="grid2">
         <div><label>Headline</label><input id="headline" type="text" value="Teplo do mrazu"></div>
@@ -49,7 +48,7 @@
           <label>Velikost</label><input id="hSize" type="number" value="28" min="8" max="120">
           <label>Barva</label><input id="hColor" type="color" value="#ffffff">
           <label>Font</label>
-          <select id="hFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select><button id="animPlay" class="btn ghost" style="padding:6px 10px">Play</button></div>
+          <select id="hFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select>
         </div>
         <div class="card">
           <div class="mini">Subline</div>
@@ -67,7 +66,8 @@
           <select id="cFont"><option>Inter</option><option>Arial</option><option>Helvetica</option><option>Segoe UI</option><option>Roboto</option></select>
         </div>
       </div>
-            <label class="mt">Pozadí (CSS)</label>
+      
+      <label class="mt">Pozadí (CSS)</label>
       <input id="bg" type="text" value="linear-gradient(180deg,#17324F,#0A1A2B)">
 
       <details class="mt">
@@ -75,9 +75,10 @@
         <div id="perSize"></div>
       </details>
 
-      <div class="title mt">AI Copy</div>
-      <div id="aiPanel" class="aiPanel">
-        <div class="row"><button class="btn ghost" id="undoBtn" title="Zpět (undo)">⟲</button><button class="btn ghost" id="redoBtn" title="Znovu (redo)">⟳</button><button class="btn ghost" id="resetPos" title="Resetovat pozice a měřítka">Reset</button>
+      <!-- AI Copy removed -->
+      <!-- AI panel removed start -->
+      <div id="aiPanel" class="aiPanel" style="display:none">
+        <div class="row">
           <input id="kw" type="text" placeholder="Klíčová slova (např. zimní bunda, nepromokavá, sleva 30 %)">
           <button id="genKw" class="btn">+ Vytvořit z KW</button>
         </div>
@@ -109,7 +110,7 @@
             <option value="slideSide">Slide-side</option>
             <option value="pop">Pop-in</option>
             <option value="combo">Combo</option>
-          </select>
+          </select><button id="animPlay" class="btn ghost" style="padding:6px 10px">Play</button></div>
         </div>
         <div>
           <label>Délka jedné sekvence</label>
@@ -132,7 +133,6 @@
         <div class="pill">Klikni & táhni: BG, logo, headline, subline, CTA • <button id="replayAll" class="btn ghost" style="padding:4px 8px">Replay</button></div>
       </div>
       <div id="preview" class="previewGrid"></div>
-      <div id="previewWide" class="previewGrid wide"></div>
       <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn primary" id="exportZip">Export HTML5</button></div>
     </section>
   </main>

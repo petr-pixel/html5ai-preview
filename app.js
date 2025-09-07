@@ -68,33 +68,29 @@
     return '';
   }
 
-  
   function applyPreviewAnim(){
     var style = document.getElementById('animStyle');
     if(!style){ style = document.createElement('style'); style.id='animStyle'; document.head.appendChild(style); }
     style.textContent = presetCss(el('animPreset').value, el('animDur').value);
-
     var loops = Math.min(3, parseInt(el('animLoops').value,10) || 1);
     var dur = (parseFloat(el('animDur').value) || 2) + 0.6;
     var stopAfter = Math.min(30, loops * dur);
-
     var nodes = document.querySelectorAll('.banner .headline,.banner .subline,.banner .cta,.banner img');
-    // hard reset
-    nodes.forEach(function(n){ n.style.animation = 'none'; n.style.animationIterationCount = ''; n.style.animationPlayState='running'; });
-    // force reflow
-    void document.body.offsetWidth;
-    // re-apply
     nodes.forEach(function(n){
-      n.style.animation = ''; // CSS from style tag applies
+      n.style.animation = 'none';
+      n.style.animationIterationCount = '';
+      n.style.animationPlayState = 'running';
+    });
+    void document.body.offsetWidth;
+    nodes.forEach(function(n){
+      n.style.animation = '';
       n.style.animationIterationCount = String(loops);
       n.style.animationPlayState = 'running';
     });
-    // stop after limit
     setTimeout(function(){
       nodes.forEach(function(n){ n.style.animationPlayState='paused'; });
     }, stopAfter*1000);
   }
-
     style.textContent = presetCss(el('animPreset').value, el('animDur').value);
     // set iteration counts and stop timer for preview
     var loops = Math.min(3, parseInt(el('animLoops').value,10)||1);
@@ -114,10 +110,8 @@
 
   // --------------- Preview renderer ---------------
   function activeSizes(){ return sizes.filter(s=>s.on); }
-  function isWide(key){ return ['320x50','320x100','728x90','970x90'].includes(key); }
   function render(){
     var grid = el('preview'); grid.innerHTML='';
-    var gridWide = el('previewWide'); if(gridWide) gridWide.innerHTML='';
     var headline=el('headline').value, subline=el('subline').value, cta=el('cta').value;
     var click=el('clickUrl').value, bgCss=el('bg').value;
     var logoUrl=el('logoUrl').value || inlineLogoData, bgUrl=el('bgUrl').value || inlineBgData;
@@ -179,8 +173,7 @@
       }
 
       banner.appendChild(H); banner.appendChild(S); banner.appendChild(C);
-      card.appendChild(head); card.appendChild(canvas); canvas.appendChild(banner);
-      if(isWide(s.key) && gridWide){ gridWide.appendChild(card); } else { grid.appendChild(card); }
+      card.appendChild(head); card.appendChild(canvas); canvas.appendChild(banner); grid.appendChild(card);
     });
     applyPreviewAnim();
     renderPerSize(); validate();
@@ -189,7 +182,7 @@
   // --------------- Drag & Drop ---------------
   (function setupDrag(){
     var dragging=null;
-    on('preview','pointerdown',function(e){ pushHist();
+    on('preview','pointerdown',function(e){
       var t=e.target; var b=t.closest('.banner'); if(!b) return;
       var key=b.dataset.sizeKey; var type=null;
       if(t.alt==='bg') type='bg'; else if(t.alt==='logo') type='logo';
@@ -209,25 +202,6 @@
     });
     ['pointerup','pointercancel','pointerleave'].forEach(function(ev){ on('preview',ev,function(){ dragging=null; render(); }); });
   })();
-
-  // --------------- History (Undo/Redo) ---------------
-  var _hist = [], _redo = [];
-  function snapshot(){ return JSON.stringify(state); }
-  function restore(json){ var obj = JSON.parse(json); Object.keys(obj).forEach(function(k){ state[k] = obj[k]; }); render(); }
-  function pushHist(){ _hist.push(snapshot()); if(_hist.length>50) _hist.shift(); _redo.length=0; }
-  function undo(){ if(_hist.length){ var cur = snapshot(); var prev = _hist.pop(); _redo.push(cur); restore(prev); } }
-  function redo(){ if(_redo.length){ var cur = snapshot(); var next = _redo.pop(); _hist.push(cur); restore(next); } }
-  function resetPositions(){
-    sizes.forEach(function(s){
-      var st = state[s.key];
-      st.bgX=0; st.bgY=0; st.bgScale=1;
-      st.logoX=0; st.logoY=0; st.logoScale=1;
-      st.h.x=0; st.h.y=0;
-      st.s.x=0; st.s.y=0;
-      st.c.x=0; st.c.y=0;
-    });
-    render();
-  }
 
   // --------------- Per-size sliders ---------------
   function renderPerSize(){
@@ -287,7 +261,7 @@
   })();
 
   // --------------- Extract (logo + colors) ---------------
-  function urlsFrom(origin, paths){ return paths.map(function(p){ return origin.replace(/\/$/,'') + p; }); }
+  function urlsFrom(origin, paths){ return paths.map(p=> origin.replace(/\/$/,'') + p); }
   function tryLoadImage(url){ return new Promise(function(resolve){ var img=new Image(); img.crossOrigin='anonymous'; img.onload=function(){ resolve({ok:true,url, img}) }; img.onerror=function(){ resolve({ok:false,url}) }; img.src=url; }); }
   async function firstImage(cands){ for (var i=0;i<cands.length;i++){ var r=await tryLoadImage(cands[i]); if(r.ok) return r; } return null; }
   function dominantColor(img){
@@ -299,40 +273,17 @@
       return '#'+[r,g,b].map(x=>('0'+x.toString(16)).slice(-2)).join('');
     }catch(e){ return null; }
   }
-  
   async function smartExtract(rawUrl){
     try{
-      var status = document.getElementById('extractStatus');
-      if(!rawUrl){ if(status) status.textContent='Zadej URL a klikni na Extract.'; return; }
+      if(!rawUrl) return;
       var u = new URL(rawUrl); el('clickUrl').value = rawUrl;
-      if(status) status.textContent='Hledám logo a obrázky…';
-      var logoPaths=['/favicon.ico','/favicon.png','/apple-touch-icon.png','/logo.png','/assets/logo.png','/static/logo.png','/img/logo.png','/images/logo.png','/brand/logo.png','/assets/img/logo.svg','/images/favicon-32x32.png'];
-      var heroPaths=['/og-image.jpg','/og-image.png','/banner.jpg','/banner.png','/images/hero.jpg','/images/kv.jpg','/cover.jpg','/cover.png'];
-      var logos = urlsFrom(u.origin, logoPaths);
-      var heros = urlsFrom(u.origin, heroPaths);
-      var L = await firstImage(logos);
-      var foundLogo=false, foundBg=false, setColor=false;
-      if(L && L.ok){
-        el('logoUrl').value=L.url; foundLogo=true;
-        var dom=dominantColor(L.img); if(dom){ el('cBgColor').value=dom; setColor=true; }
-      }
-      var H = await firstImage(heros); if(H && H.ok){ el('bgUrl').value=H.url; foundBg=true; }
+      var logos = urlsFrom(u.origin, ['/favicon.ico','/favicon.png','/apple-touch-icon.png','/logo.png','/assets/logo.png','/static/logo.png','/img/logo.png','/images/logo.png','/brand/logo.png']);
+      var heros = urlsFrom(u.origin, ['/og-image.jpg','/og-image.png','/banner.jpg','/banner.png','/images/hero.jpg','/images/kv.jpg']);
+      var L = await firstImage(logos); if(L && L.ok){ el('logoUrl').value=L.url; var dom=dominantColor(L.img); if(dom){ el('cBgColor').value=dom; } }
+      var H = await firstImage(heros); if(H && H.ok){ el('bgUrl').value=H.url; }
       render();
-      if(status){
-        if(foundLogo||foundBg){
-          status.textContent = 'Nalezeno: ' + (foundLogo?'logo ':'') + (foundBg?'pozadí ':'') + (setColor?'+ CTA barva z favicony':'');
-        }else{
-          status.textContent = 'Nepodařilo se nic najít. Nahraj logo/obrázek ručně.';
-        }
-      }
-    }catch(e){
-      console.warn('smartExtract error',e);
-      var status = document.getElementById('extractStatus');
-      if(status) status.textContent='Extract selhal. Zkontroluj CORS nebo zadej assets ručně.';
-      render();
-    }
+    }catch(e){ console.warn('smartExtract error',e); render(); }
   }
-
 
   // --------------- AI Copy variants ---------------
   function addVariant(obj){
@@ -509,10 +460,9 @@
   on('exportZip','click', exportZip);
   on('exportZipTop','click', exportZip);
   on('animPlay','click', function(){ applyPreviewAnim(); });
-  on('undoBtn','click', function(){ undo(); });
-  on('redoBtn','click', function(){ redo(); });
-  on('resetPos','click', function(){ pushHist(); resetPositions(); });
-
+  on('animPreset','change', function(){ applyPreviewAnim(); });
+  on('animDur','change', function(){ applyPreviewAnim(); });
+  on('animLoops','change', function(){ applyPreviewAnim(); });
   on('replayAll','click', function(){ applyPreviewAnim(); render(); });
 
   on('genKw','click', function(){
