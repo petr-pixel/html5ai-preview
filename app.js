@@ -38,7 +38,19 @@
     var r = new FileReader(); r.onload=function(){ cb(r.result); }; r.readAsDataURL(f);
   }
 
-  // --------------- Animation CSS (preview + export shared) ---------------
+  var isPlaying = false;
+function animNodes(){ return document.querySelectorAll('.banner .headline,.banner .subline,.banner .cta,.banner img'); }
+function resetAnimations(){
+  var nodes = animNodes();
+  nodes.forEach(function(n){ n.style.animation='none'; n.style.animationIterationCount=''; n.style.animationPlayState='paused'; });
+  void document.body.offsetWidth;
+  var loops = Math.min(3, parseInt(el('animLoops').value,10) || 1);
+  nodes.forEach(function(n){ n.style.animation=''; n.style.animationIterationCount=String(loops); n.style.animationPlayState = isPlaying ? 'running' : 'paused'; });
+}
+function playAnimations(){ isPlaying = true; animNodes().forEach(n=> n.style.animationPlayState='running'); var t=el('animToggle'); if(t) t.textContent='Pause'; }
+function pauseAnimations(){ isPlaying = false; animNodes().forEach(n=> n.style.animationPlayState='paused'); var t=el('animToggle'); if(t) t.textContent='Play'; }
+
+// --------------- Animation CSS (preview + export shared) ---------------
   function presetCss(preset, dur){
     var d = parseFloat(dur)||2;
     var delay = 0.2;
@@ -69,28 +81,17 @@
   }
 
   function applyPreviewAnim(){
-    var style = document.getElementById('animStyle');
-    if(!style){ style = document.createElement('style'); style.id='animStyle'; document.head.appendChild(style); }
-    style.textContent = presetCss(el('animPreset').value, el('animDur').value);
+  var style = document.getElementById('animStyle');
+  if(!style){ style = document.createElement('style'); style.id='animStyle'; document.head.appendChild(style); }
+  style.textContent = presetCss(el('animPreset').value, el('animDur').value);
+  resetAnimations();
+  if(isPlaying){
     var loops = Math.min(3, parseInt(el('animLoops').value,10) || 1);
     var dur = (parseFloat(el('animDur').value) || 2) + 0.6;
     var stopAfter = Math.min(30, loops * dur);
-    var nodes = document.querySelectorAll('.banner .headline,.banner .subline,.banner .cta,.banner img');
-    nodes.forEach(function(n){
-      n.style.animation = 'none';
-      n.style.animationIterationCount = '';
-      n.style.animationPlayState = 'running';
-    });
-    void document.body.offsetWidth;
-    nodes.forEach(function(n){
-      n.style.animation = '';
-      n.style.animationIterationCount = String(loops);
-      n.style.animationPlayState = 'running';
-    });
-    setTimeout(function(){
-      nodes.forEach(function(n){ n.style.animationPlayState='paused'; });
-    }, stopAfter*1000);
+    setTimeout(function(){ if(isPlaying) pauseAnimations(); }, stopAfter*1000);
   }
+}
     style.textContent = presetCss(el('animPreset').value, el('animDur').value);
     // set iteration counts and stop timer for preview
     var loops = Math.min(3, parseInt(el('animLoops').value,10)||1);
@@ -456,10 +457,11 @@
   });
   on('logoFile','change', function(e){ readFileToUrl(e.target, function(url){ el('logoUrl').value=url; inlineLogoData=url; render(); }); });
   on('bgFile','change', function(e){ readFileToUrl(e.target, function(url){ el('bgUrl').value=url; inlineBgData=url; render(); }); });
-    on('importUrl','click', function(){ smartExtract(el('brandUrl').value||''); });
+  on('fontFile','change', function(e){ readFileToUrl(e.target, function(url){ fontDataUrl=url; render(); }); });
+  on('importUrl','click', function(){ smartExtract(el('brandUrl').value||''); });
   on('exportZip','click', exportZip);
   on('exportZipTop','click', exportZip);
-  on('animPlay','click', function(){ applyPreviewAnim(); });
+  on('animToggle','click', function(){ if(isPlaying) pauseAnimations(); else playAnimations(); });
   on('animPreset','change', function(){ applyPreviewAnim(); });
   on('animDur','change', function(){ applyPreviewAnim(); });
   on('animLoops','change', function(){ applyPreviewAnim(); });
@@ -469,5 +471,5 @@
     var v = variantFromKw(el('kw').value||''); addVariant(v);
   });
 
-  document.addEventListener('DOMContentLoaded', function(){ render(); renderVariants(); }, false);
+  document.addEventListener('DOMContentLoaded', function(){ render(); renderVariants(); isPlaying=false; applyPreviewAnim(); pauseAnimations(); }, false);
 })();
