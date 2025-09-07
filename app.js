@@ -1,55 +1,39 @@
 
-var JSZip = function(){ this.files=[]; };
+var JSZip = function(){ this.files=[]; this._name=''; };
 JSZip.prototype.folder=function(name){ var f=new JSZip(); f._name=name; this.files.push(f); return f; };
 JSZip.prototype.file=function(name,content){ this.files.push({name:(this._name?this._name+'/':'')+name, content: content}); };
+JSZip.prototype._collect=function(prefix){ var out=[]; this.files.forEach(function(it){ if(it instanceof JSZip){ out=out.concat(it._collect(prefix?(prefix+'/'+it._name):it._name)); } else { out.push({name:(prefix?prefix+'/':'')+it.name, content:it.content}); } }); return out; };
 JSZip.prototype.generateAsync=function(opts){ var self=this;
   function crc32(buf){ var table = window._crcTable || (window._crcTable=(function(){var c,t=[];for(var n=0;n<256;n++){c=n;for(var k=0;k<8;k++) c = ((c&1)?(0xEDB88320^(c>>>1)):(c>>>1)); t[n]=c>>>0;} return t;})()); var crc=-1; for(var i=0;i<buf.length;i++){ crc = (crc>>>8) ^ table[(crc ^ buf[i]) & 0xFF]; } return (crc^(-1))>>>0; }
-  function str2buf(str){ var enc=new TextEncoder(); return enc.encode(str); }
-  var files=[];
-  function collect(f,prefix){ f.files.forEach(function(it){ if(it instanceof JSZip){ collect(it, (prefix?prefix+'/':'')+(it._name||'')); } else { files.push({name:(prefix?prefix+'/':'')+it.name, content: it.content}); } }); }
-  collect(self,'');
+  function enc(s){ return new TextEncoder().encode(s); }
+  var files=self._collect('');
   var chunks=[]; var central=[]; var offset=0;
   files.forEach(function(f){
-    var data = (typeof f.content==='string')? str2buf(f.content) : (f.content instanceof Uint8Array? f.content : str2buf(String(f.content||'')));
-    var nameStr = f.name; var nameBytes = new TextEncoder().encode(nameStr);
+    var data = (typeof f.content==='string')? enc(f.content) : (f.content instanceof Uint8Array? f.content : enc(String(f.content||'')));
+    var nameBytes = enc(f.name);
     var crc = crc32(data); var size = data.length;
-    function push16(n){ chunks.push(new Uint8Array([n&255,(n>>8)&255])); }
-    function push32(n){ chunks.push(new Uint8Array([n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255])); }
-    // Local file header
-    chunks.push(new Uint8Array([0x50,0x4b,0x03,0x04, 10,0, 0,0, 0,0, 0,0])); // sig + ver + flags + method + time + date
-    push32(crc); push32(size); push32(size);
-    push16(nameBytes.length); push16(0);
+    function p16(n){ chunks.push(new Uint8Array([n&255,(n>>8)&255])); }
+    function p32(n){ chunks.push(new Uint8Array([n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255])); }
+    chunks.push(new Uint8Array([0x50,0x4b,0x03,0x04, 10,0, 0,0, 0,0, 0,0]));
+    p32(crc); p32(size); p32(size);
+    p16(nameBytes.length); p16(0);
     chunks.push(nameBytes); chunks.push(data);
-    // Central dir entry
-    var cen = [];
-    function cpush(arr){ cen.push(arr instanceof Uint8Array? arr : new Uint8Array(arr)); }
-    function c16(n){ cpush([n&255,(n>>8)&255]); }
-    function c32(n){ cpush([n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255]); }
-    cpush([0x50,0x4b,0x01,0x02, 0,0, 10,0, 0,0, 0,0, 0,0]);
-    c32(crc); c32(size); c32(size); c16(nameBytes.length); c16(0); c16(0); c16(0); c16(0); c32(0);
-    cpush(nameBytes);
-    var cenBuf = new Uint8Array(cen.reduce((a,b)=>a+b.length,0)); var o=0; cen.forEach(function(x){ cenBuf.set(x,o); o+=x.length; });
-    central.push({buf: cenBuf, off: offset, len: 30+nameBytes.length+size});
-    offset += 30 + nameBytes.length + size;
+    var cen=[]; function c16(n){ cen.push(n&255,(n>>8)&255); } function c32(n){ cen.push(n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255); }
+    var nb=nameBytes.length;
+    var cenEntry=[0x50,0x4b,0x01,0x02, 0,0, 10,0, 0,0, 0,0, 0,0];
+    cen.push.apply(cen, cenEntry); c32(crc); c32(size); c32(size); c16(nb); c16(0); c16(0); c16(0); c16(0); c32(0);
+    for(var i=0;i<nb;i++) cen.push(nameBytes[i]);
+    central.push(new Uint8Array(cen));
+    offset += 30 + nb + size;
   });
-  // Build final
-  var cenSize=central.reduce((a,c)=>a+c.buf.length,0);
-  var cenStart=offset;
-  var outLen = offset + cenSize + 22;
-  var out = new Uint8Array(outLen); var pos=0;
+  var cenSize=central.reduce((a,c)=>a+c.length,0); var cenStart=offset;
+  var outLen=offset+cenSize+22; var out=new Uint8Array(outLen); var pos=0;
   function append(arr){ out.set(arr,pos); pos+=arr.length; }
-  // locals
-  chunks.forEach(append);
-  // central
-  central.forEach(function(c){ append(c.buf); });
-  // end of central dir
+  chunks.forEach(append); central.forEach(append);
   append(new Uint8Array([0x50,0x4b,0x05,0x06, 0,0, 0,0]));
-  var count = files.length;
-  append(new Uint8Array([count&255,(count>>8)&255])); // this disk
-  append(new Uint8Array([count&255,(count>>8)&255])); // total
+  var count=files.length; append(new Uint8Array([count&255,(count>>8)&255])); append(new Uint8Array([count&255,(count>>8)&255]));
   append(new Uint8Array([cenSize&255,(cenSize>>8)&255,(cenSize>>16)&255,(cenSize>>24)&255]));
-  append(new Uint8Array([cenStart&255,(cenStart>>8)&255,(cenStart>>16)&255,(cenStart>>24)&255]));
-  append(new Uint8Array([0,0]));
+  append(new Uint8Array([cenStart&255,(cenStart>>8)&255,(cenStart>>16)&255,(cenStart>>24)&255])); append(new Uint8Array([0,0]));
   return Promise.resolve(new Blob([out], {type:"application/zip"}));
 };
 
@@ -58,452 +42,252 @@ var saveAs = saveAs || (function(view) {
 "use strict"; return function(blob, name){ var url = URL.createObjectURL(blob); var a = document.createElement("a"); a.href=url; a.download=name||"download"; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 100); }; }(typeof self !== "undefined" && self || typeof window !== "undefined" && window || this.content));
 
 (function(){
-  'use strict';
-  // ---------------- Config ----------------
-  var DEFAULT_SIZES = [
-    {key:'300x250', w:300, h:250, on:true},
-    {key:'320x50', w:320, h:50, on:false},
-    {key:'320x100', w:320, h:100, on:false},
-    {key:'250x250', w:250, h:250, on:false},
-    {key:'200x200', w:200, h:200, on:false},
-    {key:'336x280', w:336, h:280, on:false},
-    {key:'728x90', w:728, h:90, on:false},
-    {key:'970x90', w:970, h:90, on:false},
-    {key:'160x600', w:160, h:600, on:false},
-    {key:'300x600', w:300, h:600, on:true}
+  var SIZES=[
+    {key:'300x250',w:300,h:250},{key:'336x280',w:336,h:280},
+    {key:'300x600',w:300,h:600},{key:'160x600',w:160,h:600},
+    {key:'250x250',w:250,h:250},{key:'200x200',w:200,h:200},
+    {key:'728x90',w:728,h:90},{key:'970x90',w:970,h:90},
+    {key:'320x50',w:320,h:50},{key:'320x100',w:320,h:100}
   ];
-  var sizes = JSON.parse(JSON.stringify(DEFAULT_SIZES));
-  var state = {};
-  sizes.forEach(function(s){
-    state[s.key] = {
-      bgX:0,bgY:0,bgScale:1, logoX:0,logoY:0,logoScale:1,
-      h:{x:0,y:0,size:28,color:'#ffffff',font:'Inter'},
-      s:{x:0,y:0,size:16,color:'#cfe3ff',font:'Inter'},
-      c:{x:0,y:0,size:16,textColor:'#061123',bgColor:'#E4572E',font:'Inter'}
-    };
-  });
-  var fontDataUrl = null; // uploaded WOFF/WOFF2 as data URL
-  var inlineLogoData = null, inlineBgData = null; // if uploaded → used for export strict
-  var variants = []; // AI copy variants
-
   function el(id){ return document.getElementById(id); }
-  function on(id,ev,fn){ var n=typeof id==='string'?el(id):id; n && n.addEventListener(ev,fn,false); }
   function px(n){ return n+'px'; }
-  function parseSizeKey(k){ var a=k.split('x'); return {w:parseInt(a[0],10), h:parseInt(a[1],10)}; }
-
-  // --------------- File helpers ---------------
-  function readFileToUrl(input, cb){
-    var f = input.files && input.files[0]; if(!f) return;
-    var r = new FileReader(); r.onload=function(){ cb(r.result); }; r.readAsDataURL(f);
+  function activeSizes(){
+    var a=[]; document.querySelectorAll('#sizes input[type=checkbox]').forEach(function(cb){
+      if(cb.checked){ var s=SIZES.find(x=>x.key===cb.dataset.size); if(s) a.push(s); }
+    });
+    if(!a.length) a.push(SIZES[0]);
+    return a;
   }
+  function isWide(key){ return ['728x90','970x90','320x50','320x100'].includes(key); }
 
-  // --------------- Animation CSS (preview + export shared) ---------------
-  function presetCss(preset, dur){
-    var d = parseFloat(dur)||2;
-    var delay = 0.2;
-    var css='';
-    css += '@keyframes fadeIn{from{opacity:0}to{opacity:1}}';
-    css += '@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}';
-    css += '@keyframes slideLeft{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}';
-    css += '@keyframes slideRight{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}';
-    css += '@keyframes pop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}';
-    var h='.headline', s='.subline', c='.cta', l='img[alt="logo"]';
-    if(preset==='none') return '';
-    if(preset==='fade'){
-      return h+','+s+','+c+','+l+'{animation:fadeIn '+d+'s ease both} '+s+'{animation-delay:'+delay+'s} '+c+'{animation-delay:'+(delay*2)+'s} '+l+'{animation-delay:'+(delay*3)+'s}';
-    }
-    if(preset==='slideUp'){
-      return h+','+s+','+c+','+l+'{animation:slideUp '+d+'s ease both} '+s+'{animation-delay:'+delay+'s} '+c+'{animation-delay:'+(delay*2)+'s} '+l+'{animation-delay:'+(delay*3)+'s}';
-    }
-    if(preset==='slideSide'){
-      return h+'{animation:slideLeft '+d+'s ease both} '+s+'{animation:slideLeft '+d+'s ease '+delay+'s both} '+c+'{animation:slideRight '+d+'s ease '+(delay*2)+'s both} '+l+'{animation:slideUp '+d+'s ease '+(delay*3)+'s both}';
-    }
-    if(preset==='pop'){
-      return h+','+s+','+c+','+l+'{animation:pop '+d+'s ease both} '+s+'{animation-delay:'+delay+'s} '+c+'{animation-delay:'+(delay*2)+'s} '+l+'{animation-delay:'+(delay*3)+'s}';
-    }
-    if(preset==='combo'){
-      return h+'{animation:slideLeft '+d+'s ease both} '+s+'{animation:slideRight '+d+'s ease '+delay+'s both} '+c+'{animation:slideUp '+d+'s ease '+(delay*2)+'s both} '+l+'{animation:fadeIn '+d+'s ease '+(delay*3)+'s both}';
-    }
+  var state={};
+  SIZES.forEach(function(s){
+    state[s.key]={ bgUrl:'',logoUrl:'', bgX:0,bgY:0,bgScale:1, logoX:0,logoY:0,logoScale:1, h:{x:0,y:0,size:28}, s:{x:0,y:0,size:16}, c:{x:0,y:0,size:16} };
+  });
+  var isPlaying=false;
+
+  function animNodes(){ return document.querySelectorAll('.banner .headline,.banner .subline,.banner .cta'); }
+  function presetCss(name, dur){
+    dur = parseFloat(dur)||2;
+    if(name==='fade') return '.banner .headline,.banner .subline,.banner .cta{animation:fade '+dur+'s ease both} @keyframes fade{0%{opacity:0}100%{opacity:1}}';
+    if(name==='slideUp') return '.banner .headline,.banner .subline,.banner .cta{animation:up '+dur+'s ease both} @keyframes up{0%{opacity:0; transform:translate(-50%,-30%)}100%{opacity:1; transform:translate(-50%,-50%)}}';
+    if(name==='slideSide') return '.banner .headline,.banner .subline,.banner .cta{animation:side '+dur+'s ease both} @keyframes side{0%{opacity:0; left:0%}100%{opacity:1; left:50%}}';
+    if(name==='pop') return '.banner .headline,.banner .subline,.banner .cta{animation:pop '+dur+'s ease both} @keyframes pop{0%{opacity:0; transform:translate(-50%,-50%) scale(.8)}100%{opacity:1; transform:translate(-50%,-50%) scale(1)}}';
+    if(name==='combo') return '.banner .headline{animation:up '+dur+'s ease both}.banner .subline{animation:fade '+dur+'s .2s ease both}.banner .cta{animation:pop '+dur+'s .4s ease both}@keyframes up{0%{opacity:0; transform:translate(-50%,-30%)}100%{opacity:1; transform:translate(-50%,-50%)}}@keyframes fade{0%{opacity:0}100%{opacity:1}}@keyframes pop{0%{opacity:0; transform:translate(-50%,-50%) scale(.8)}100%{opacity:1; transform:translate(-50%,-50%) scale(1)}}';
     return '';
   }
-
-  function applyPreviewAnim(){
+  function ensureAnimStyle(){
     var style = document.getElementById('animStyle');
-    if(!style){ style = document.createElement('style'); style.id='animStyle'; document.head.appendChild(style); }
+    if(!style){ style=document.createElement('style'); style.id='animStyle'; document.head.appendChild(style); }
     style.textContent = presetCss(el('animPreset').value, el('animDur').value);
-    // set iteration counts and stop timer for preview
-    var loops = Math.min(3, parseInt(el('animLoops').value,10)||1);
-    var dur = (parseFloat(el('animDur').value)||2)+0.6;
-    var stopAfter = Math.min(30, loops*dur);
-    setTimeout(function(){
-      document.querySelectorAll('.banner .headline,.banner .subline,.banner .cta,.banner img').forEach(function(n){
-        n.style.animationIterationCount = String(loops);
-      });
-    },0);
-    setTimeout(function(){
-      document.querySelectorAll('.banner .headline,.banner .subline,.banner .cta,.banner img').forEach(function(n){
-        n.style.animationPlayState='paused';
-      });
-    }, stopAfter*1000);
+  }
+  function playAnimations(){ isPlaying=true; animNodes().forEach(n=> n.style.animationPlayState='running'); var t=el('animToggle'); if(t) t.textContent='Pause'; var h=document.getElementById('animToggleHdr'); if(h) h.textContent='Pause'; }
+  function pauseAnimations(){ isPlaying=false; animNodes().forEach(n=> n.style.animationPlayState='paused'); var t=el('animToggle'); if(t) t.textContent='Play'; var h=document.getElementById('animToggleHdr'); if(h) h.textContent='Play'; }
+  function resetAnimations(){
+    var nodes=animNodes(); nodes.forEach(n=>{ n.style.animation='none'; n.style.animationPlayState='paused'; n.style.animationIterationCount=''; });
+    void document.body.offsetWidth;
+    var loops = Math.min(3, parseInt(el('animLoops').value,10) || 1);
+    nodes.forEach(n=>{ n.style.animation=''; n.style.animationIterationCount=String(loops); n.style.animationPlayState = isPlaying?'running':'paused'; });
+  }
+  function applyPreviewAnim(){ ensureAnimStyle(); resetAnimations(); }
+
+  function readFileAsDataURL(file){
+    return new Promise(function(res, rej){
+      var fr = new FileReader();
+      fr.onload = function(){ res(fr.result); };
+      fr.onerror = function(){ rej(fr.error || new Error('read error')); };
+      fr.readAsDataURL(file);
+    });
   }
 
-  // --------------- Preview renderer ---------------
-  function activeSizes(){ return sizes.filter(s=>s.on); }
   function render(){
-    var grid = el('preview'); grid.innerHTML='';
-    var headline=el('headline').value, subline=el('subline').value, cta=el('cta').value;
-    var click=el('clickUrl').value, bgCss=el('bg').value;
-    var logoUrl=el('logoUrl').value || inlineLogoData, bgUrl=el('bgUrl').value || inlineBgData;
-
-    // sync typography settings to per-size (baseline)
-    activeSizes().forEach(function(s){
-      var st = state[s.key];
-      st.h.size = parseInt(el('hSize').value,10)||st.h.size;
-      st.h.color = el('hColor').value||st.h.color;
-      st.h.font = el('hFont').value||st.h.font;
-      st.s.size = parseInt(el('sSize').value,10)||st.s.size;
-      st.s.color = el('sColor').value||st.s.color;
-      st.s.font = el('sFont').value||st.s.font;
-      st.c.size = parseInt(el('cSize').value,10)||st.c.size;
-      st.c.textColor = el('cTextColor').value||st.c.textColor;
-      st.c.bgColor = el('cBgColor').value||st.c.bgColor;
-      st.c.font = el('cFont').value||st.c.font;
-    });
+    var grid=el('preview'); grid.innerHTML='';
+    var gridWide=el('previewWide'); if(gridWide) gridWide.innerHTML='';
+    var H=el('headline').value||''; var S=el('subline').value||''; var C=el('cta').value||'';
+    var hColor=el('hColor').value; var sColor=el('sColor').value; var cTxt=el('cTextColor').value; var cBg=el('cBgColor').value;
 
     activeSizes().forEach(function(s){
-      var card = document.createElement('div'); card.className='previewCard';
-      var head = document.createElement('div'); head.className='previewHead';
-      var lab = document.createElement('div'); lab.className='previewLabel'; lab.textContent=s.key.replace('x','×');
-      var replay = document.createElement('button'); replay.className='btn ghost'; replay.textContent='↺'; replay.style.padding='4px 8px';
-      replay.addEventListener('click', function(){ applyPreviewAnim(); render(); });
-      head.appendChild(lab); head.appendChild(replay);
+      var st=state[s.key];
+      st.logoUrl = el('logoUrl').value||st.logoUrl;
+      st.bgUrl = el('bgUrl').value||st.bgUrl;
 
-      var canvas = document.createElement('div'); canvas.className='canvas'; canvas.style.width=px(s.w); canvas.style.height=px(s.h);
-      var banner = document.createElement('div'); banner.className='banner'; banner.style.background=bgCss; banner.dataset.sizeKey=s.key;
+      var card=document.createElement('div'); card.className='previewCard';
+      var head=document.createElement('div'); head.className='mini'; head.textContent=s.key; card.appendChild(head);
+      var canvas=document.createElement('div'); canvas.className='canvas'; canvas.style.width=px(s.w); canvas.style.height=px(s.h); card.appendChild(canvas);
+      var banner=document.createElement('div'); banner.className='banner'; banner.dataset.sizeKey=s.key; banner.style.background= st.bgUrl ? ('url(\"'+st.bgUrl+'\") center/cover') : 'linear-gradient(180deg,#17324F,#0A1A2B)'; canvas.appendChild(banner);
 
-      var tr = state[s.key];
-      // BG image
-      if(bgUrl){
-        var bgImg = document.createElement('img');
-        bgImg.alt='bg'; bgImg.style.left='50%'; bgImg.style.top='50%';
-        bgImg.style.transform='translate(calc(-50% + '+tr.bgX+'px), calc(-50% + '+tr.bgY+'px)) scale('+tr.bgScale+')';
-        bgImg.style.transformOrigin='center center'; bgImg.style.height='110%'; bgImg.style.minWidth='110%'; bgImg.style.opacity='.95';
-        bgImg.src=bgUrl; banner.appendChild(bgImg);
-      }
-      // Headline
-      var H=document.createElement('div'); H.className='headline'; H.textContent=headline;
-      H.style.fontSize=px(tr.h.size); H.style.color=tr.h.color; H.style.fontFamily=tr.h.font;
-      H.style.left='50%'; H.style.top='45%'; H.style.transform='translate(calc(-50% + '+tr.h.x+'px), calc(-50% + '+tr.h.y+'px))'; H.style.width='calc(100% - 40px)'; H.style.textAlign='center'; H.style.fontWeight='800';
-      // Subline
-      var S=document.createElement('div'); S.className='subline'; S.textContent=subline;
-      S.style.fontSize=px(tr.s.size); S.style.color=tr.s.color; S.style.fontFamily=tr.s.font;
-      S.style.left='50%'; S.style.top='63%'; S.style.transform='translate(calc(-50% + '+tr.s.x+'px), calc(-50% + '+tr.s.y+'px))'; S.style.width='calc(100% - 50px)'; S.style.textAlign='center';
-      // CTA
-      var C=document.createElement('div'); C.className='cta'; C.textContent=cta;
-      C.style.color=tr.c.textColor; C.style.background=tr.c.bgColor; C.style.fontFamily=tr.c.font; C.style.fontSize=px(tr.c.size);
-      C.style.bottom=px(Math.max(8, Math.round(s.h*0.05) - tr.c.y)); C.style.left='50%'; C.style.transform='translate(calc(-50% + '+tr.c.x+'px))';
-      C.style.padding=px(Math.max(4,Math.round(s.h*0.04)))+' '+px(Math.max(8,Math.round(s.w*0.04)));
+      if(st.logoUrl){ var li=document.createElement('img'); li.className='logoImg'; li.src=st.logoUrl; li.style.transform='translate('+st.logoX+'px,'+st.logoY+'px) scale('+st.logoScale+')'; li.dataset.type='logo'; banner.appendChild(li); }
 
-      // Logo
-      if(logoUrl){
-        var L=document.createElement('img'); L.alt='logo'; L.style.left='10px'; L.style.top='10px';
-        L.style.transform='translate('+tr.logoX+'px,'+tr.logoY+'px) scale('+tr.logoScale+')'; L.style.height=px(Math.round(s.h*0.12));
-        L.style.width='auto'; L.style.opacity='.95'; L.src=logoUrl; banner.appendChild(L);
-      }
+      var hl=document.createElement('div'); hl.className='headline'; hl.textContent=H; hl.style.color=hColor; hl.style.fontSize=px(st.h.size||28); hl.style.transform='translate(calc(-50% + '+(st.h.x||0)+'px), calc(-50% + '+(st.h.y||0)+'px))'; hl.dataset.type='h'; banner.appendChild(hl);
+      var sl=document.createElement('div'); sl.className='subline'; sl.textContent=S; sl.style.color=sColor; sl.style.fontSize=px(st.s.size||16); sl.style.transform='translate(calc(-50% + '+(st.s.x||0)+'px), calc(-50% + '+(st.s.y||0)+'px))'; sl.dataset.type='s'; banner.appendChild(sl);
+      var ct=document.createElement('div'); ct.className='cta'; ct.textContent=C; ct.style.color=cTxt; ct.style.background=cBg; ct.style.fontSize=px(st.c.size||16); ct.style.transform='translate(calc(-50% + '+(st.c.x||0)+'px), calc(-50% + '+(st.c.y||0)+'px))'; ct.dataset.type='c'; banner.appendChild(ct);
 
-      banner.appendChild(H); banner.appendChild(S); banner.appendChild(C);
-      card.appendChild(head); card.appendChild(canvas); canvas.appendChild(banner); grid.appendChild(card);
+      if(isWide(s.key) && gridWide){ gridWide.appendChild(card); } else { grid.appendChild(card); }
     });
+
     applyPreviewAnim();
-    renderPerSize(); validate();
+    renderPerSize();
+    validate();
   }
 
-  // --------------- Drag & Drop ---------------
-  (function setupDrag(){
-    var dragging=null;
-    on('preview','pointerdown',function(e){
-      var t=e.target; var b=t.closest('.banner'); if(!b) return;
-      var key=b.dataset.sizeKey; var type=null;
-      if(t.alt==='bg') type='bg'; else if(t.alt==='logo') type='logo';
-      else if(t.classList.contains('headline')) type='h';
-      else if(t.classList.contains('subline')) type='s';
-      else if(t.classList.contains('cta')) type='c'; else return;
-      dragging={key:key,type:type,el:t,startX:e.clientX,startY:e.clientY}; e.preventDefault(); t.setPointerCapture && t.setPointerCapture(e.pointerId);
-    });
-    on('preview','pointermove',function(e){
-      if(!dragging) return; var dx=e.clientX-dragging.startX, dy=e.clientY-dragging.startY; var tr=state[dragging.key];
-      if(dragging.type==='bg'){ tr.bgX+=dx; tr.bgY+=dy; dragging.el.style.transform='translate(calc(-50% + '+tr.bgX+'px), calc(-50% + '+tr.bgY+'px)) scale('+tr.bgScale+')'; }
-      else if(dragging.type==='logo'){ tr.logoX+=dx; tr.logoY+=dy; dragging.el.style.transform='translate('+tr.logoX+'px,'+tr.logoY+'px) scale('+tr.logoScale+')'; }
-      else if(dragging.type==='h'){ tr.h.x+=dx; tr.h.y+=dy; dragging.el.style.transform='translate(calc(-50% + '+tr.h.x+'px), calc(-50% + '+tr.h.y+'px))'; }
-      else if(dragging.type==='s'){ tr.s.x+=dx; tr.s.y+=dy; dragging.el.style.transform='translate(calc(-50% + '+tr.s.x+'px), calc(-50% + '+tr.s.y+'px))'; }
-      else if(dragging.type==='c'){ tr.c.x+=dx; tr.c.y-=dy; dragging.el.style.transform='translate(calc(-50% + '+tr.c.x+'px))'; }
-      dragging.startX=e.clientX; dragging.startY=e.clientY;
-    });
-    ['pointerup','pointercancel','pointerleave'].forEach(function(ev){ on('preview',ev,function(){ dragging=null; render(); }); });
-  })();
+  // Dragging
+  var dragging=null;
+  function onDragStart(e){
+    var t=e.target;
+    var banner=t.closest('.banner'); if(!banner) return;
+    var key=banner.dataset.sizeKey;
+    var st=state[key];
+    var type=t.dataset.type;
+    if(!type){ type='bg'; }
+    dragging={key:key,type:type, startX:e.clientX, startY:e.clientY, el:t};
+    e.preventDefault();
+  }
+  function onDragMove(e){
+    if(!dragging) return;
+    var dx=e.clientX-dragging.startX, dy=e.clientY-dragging.startY;
+    var st=state[dragging.key];
+    if(dragging.type==='h'){ st.h.x += dx; st.h.y += dy; }
+    else if(dragging.type==='s'){ st.s.x += dx; st.s.y += dy; }
+    else if(dragging.type==='c'){ st.c.x += dx; st.c.y += dy; }
+    else if(dragging.type==='logo'){ st.logoX += dx; st.logoY += dy; }
+    else if(dragging.type==='bg'){ st.bgX += dx; st.bgY += dy; }
+    dragging.startX=e.clientX; dragging.startY=e.clientY;
+    render();
+  }
+  function onDragEnd(){ dragging=null; }
 
-  // --------------- Per-size sliders ---------------
-  function renderPerSize(){
-    var wrap = el('perSize'); wrap.innerHTML='';
-    activeSizes().forEach(function(s){
-      var tr=state[s.key]; var mx=Math.max(s.w,s.h);
-      var d=document.createElement('div'); d.className='card'; d.style.marginTop='10px';
-      d.innerHTML = '<div class="mini" style="margin-bottom:6px">'+s.key.replace("x","×")+'</div>\
-      <div class="grid2">\
-        <div>\
-          <label>BG X</label><input type="range" min="'+(-mx)+'" max="'+mx+'" value="'+tr.bgX+'" data-k="'+s.key+'" data-t="bg" data-f="x">\
-          <label>BG Y</label><input type="range" min="'+(-mx)+'" max="'+mx+'" value="'+tr.bgY+'" data-k="'+s.key+'" data-t="bg" data-f="y">\
-          <label>BG Scale</label><input type="range" min="50" max="250" value="'+Math.round(tr.bgScale*100)+'" data-k="'+s.key+'" data-t="bg" data-f="s">\
-        </div>\
-        <div>\
-          <label>Logo X</label><input type="range" min="'+(-mx)+'" max="'+mx+'" value="'+tr.logoX+'" data-k="'+s.key+'" data-t="logo" data-f="x">\
-          <label>Logo Y</label><input type="range" min="'+(-mx)+'" max="'+mx+'" value="'+tr.logoY+'" data-k="'+s.key+'" data-t="logo" data-f="y">\
-          <label>Logo Scale</label><input type="range" min="50" max="250" value="'+Math.round(tr.logoScale*100)+'" data-k="'+s.key+'" data-t="logo" data-f="s">\
-        </div>\
-      </div>\
-      <div class="grid2" style="margin-top:10px">\
-        <div>\
-          <label>Headline X</label><input type="range" min="'+(-mx)+'" max="'+mx+'" value="'+tr.h.x+'" data-k="'+s.key+'" data-t="h" data-f="x">\
-          <label>Headline Y</label><input type="range" min="'+(-mx)+'" max="'+mx+'" value="'+tr.h.y+'" data-k="'+s.key+'" data-t="h" data-f="y">\
-          <label>Subline X</label><input type="range" min="'+(-mx)+'" max="'+mx+'" value="'+tr.s.x+'" data-k="'+s.key+'" data-t="s" data-f="x">\
-          <label>Subline Y</label><input type="range" min="'+(-mx)+'" max="'+mx+'" value="'+tr.s.y+'" data-k="'+s.key+'" data-t="s" data-f="y">\
-        </div>\
-        <div>\
-          <label>CTA X</label><input type="range" min="'+(-mx)+'" max="'+mx+'" value="'+tr.c.x+'" data-k="'+s.key+'" data-t="c" data-f="x">\
-          <label>CTA Y</label><input type="range" min="'+(-mx)+'" max="'+mx+'" value="'+tr.c.y+'" data-k="'+s.key+'" data-t="c" data-f="y">\
-        </div>\
+  document.addEventListener('pointerdown', function(e){
+    var t=e.target;
+    if(t.classList.contains('headline')||t.classList.contains('subline')||t.classList.contains('cta')){
+      t.dataset.type = t.classList.contains('headline')?'h': t.classList.contains('subline')?'s':'c';
+      onDragStart(e);
+    }else if(t.classList.contains('logoImg')){ t.dataset.type='logo'; onDragStart(e); }
+    else if(t.closest('.banner')){ onDragStart(e); }
+  });
+  document.addEventListener('pointermove', onDragMove);
+  document.addEventListener('pointerup', onDragEnd);
+
+  // Double click reset
+  document.addEventListener('dblclick', function(e){
+    var b=e.target.closest('.banner'); if(!b) return;
+    var st=state[b.dataset.sizeKey];
+    if(e.target.classList.contains('headline')) st.h={x:0,y:0,size:28};
+    else if(e.target.classList.contains('subline')) st.s={x:0,y:0,size:16};
+    else if(e.target.classList.contains('cta')) st.c={x:0,y:0,size:16};
+    else if(e.target.classList.contains('logoImg')){ st.logoX=0; st.logoY=0; st.logoScale=1; }
+    else { st.bgX=0; st.bgY=0; st.bgScale=1; }
+    render();
+  });
+
+  // Per-size sliders
+  function perSizeRow(key, st){
+    var wrap=document.createElement('div'); wrap.className='card';
+    wrap.innerHTML = '<div class="mini" style="margin-bottom:6px">'+key+'</div>\
+      <div class="per-size">\
+        <div class="row">Logo: X <input type="range" min="-200" max="200" value="'+st.logoX+'" data-k="'+key+'" data-f="logoX"> Y <input type="range" min="-200" max="200" value="'+st.logoY+'" data-k="'+key+'" data-f="logoY"> Scale <input type="range" min="0.2" max="3" step="0.05" value="'+st.logoScale+'" data-k="'+key+'" data-f="logoScale"></div>\
+        <div class="row">BG: X <input type="range" min="-300" max="300" value="'+st.bgX+'" data-k="'+key+'" data-f="bgX"> Y <input type="range" min="-300" max="300" value="'+st.bgY+'" data-k="'+key+'" data-f="bgY"> Scale <input type="range" min="0.2" max="3" step="0.05" value="'+st.bgScale+'" data-k="'+key+'" data-f="bgScale"></div>\
+        <div class="row">H: X <input type="range" min="-300" max="300" value="'+(st.h.x||0)+'" data-k="'+key+'" data-f="h.x"> Y <input type="range" min="-300" max="300" value="'+(st.h.y||0)+'" data-k="'+key+'" data-f="h.y"> Size <input type="range" min="10" max="80" value="'+(st.h.size||28)+'" data-k="'+key+'" data-f="h.size"></div>\
+        <div class="row">S: X <input type="range" min="-300" max="300" value="'+(st.s.x||0)+'" data-k="'+key+'" data-f="s.x"> Y <input type="range" min="-300" max="300" value="'+(st.s.y||0)+'" data-k="'+key+'" data-f="s.y"> Size <input type="range" min="8" max="60" value="'+(st.s.size||16)+'" data-k="'+key+'" data-f="s.size"></div>\
+        <div class="row">CTA: X <input type="range" min="-300" max="300" value="'+(st.c.x||0)+'" data-k="'+key+'" data-f="c.x"> Y <input type="range" min="-300" max="300" value="'+(st.c.y||0)+'" data-k="'+key+'" data-f="c.y"> Size <input type="range" min="10" max="60" value="'+(st.c.size||16)+'" data-k="'+key+'" data-f="c.size"></div>\
       </div>';
-      wrap.appendChild(d);
-    });
-    wrap.querySelectorAll('input[type=range]').forEach(function(r){
-      r.addEventListener('input', function(e){
-        var t=e.target, k=t.getAttribute('data-k'), type=t.getAttribute('data-t'), f=t.getAttribute('data-f'), v=parseInt(t.value,10);
-        var tr=state[k];
-        if(type==='bg'){ if(f==='x') tr.bgX=v; else if(f==='y') tr.bgY=v; else tr.bgScale=v/100; }
-        else if(type==='logo'){ if(f==='x') tr.logoX=v; else if(f==='y') tr.logoY=v; else tr.logoScale=v/100; }
-        else if(type==='h'){ if(f==='x') tr.h.x=v; else tr.h.y=v; }
-        else if(type==='s'){ if(f==='x') tr.s.x=v; else tr.s.y=v; }
-        else if(type==='c'){ if(f==='x') tr.c.x=v; else tr.c.y=v; }
+    return wrap;
+  }
+  function renderPerSize(){
+    var box=el('perSize'); box.innerHTML='';
+    activeSizes().forEach(function(s){ box.appendChild(perSizeRow(s.key, state[s.key])); });
+    box.querySelectorAll('input[type=range]').forEach(function(r){
+      r.addEventListener('input', function(){
+        var k=this.dataset.k, f=this.dataset.f, st=state[k];
+        if(f==='logoX') st.logoX=parseFloat(this.value);
+        else if(f==='logoY') st.logoY=parseFloat(this.value);
+        else if(f==='logoScale') st.logoScale=parseFloat(this.value);
+        else if(f==='bgX') st.bgX=parseFloat(this.value);
+        else if(f==='bgY') st.bgY=parseFloat(this.value);
+        else if(f==='bgScale') st.bgScale=parseFloat(this.value);
+        else if(f==='h.x') st.h.x=parseFloat(this.value);
+        else if(f==='h.y') st.h.y=parseFloat(this.value);
+        else if(f==='h.size') st.h.size=parseFloat(this.value);
+        else if(f==='s.x') st.s.x=parseFloat(this.value);
+        else if(f==='s.y') st.s.y=parseFloat(this.value);
+        else if(f==='s.size') st.s.size=parseFloat(this.value);
+        else if(f==='c.x') st.c.x=parseFloat(this.value);
+        else if(f==='c.y') st.c.y=parseFloat(this.value);
+        else if(f==='c.size') st.c.size=parseFloat(this.value);
         render();
-      }, false);
-    });
-  }
-
-  // --------------- Sizes toggles ---------------
-  (function setupSizes(){
-    var cont = document.getElementById('sizes');
-    cont.querySelectorAll('input[type=checkbox]').forEach(function(cb){
-      cb.addEventListener('change', function(){
-        var key=cb.getAttribute('data-size'); var s = sizes.find(x=>x.key===key); if(s){ s.on=cb.checked; render(); }
-      });
-    });
-  })();
-
-  // --------------- Extract (logo + colors) ---------------
-  function urlsFrom(origin, paths){ return paths.map(p=> origin.replace(/\/$/,'') + p); }
-  function tryLoadImage(url){ return new Promise(function(resolve){ var img=new Image(); img.crossOrigin='anonymous'; img.onload=function(){ resolve({ok:true,url, img}) }; img.onerror=function(){ resolve({ok:false,url}) }; img.src=url; }); }
-  async function firstImage(cands){ for (var i=0;i<cands.length;i++){ var r=await tryLoadImage(cands[i]); if(r.ok) return r; } return null; }
-  function dominantColor(img){
-    try{
-      var c=document.createElement('canvas'); var ctx=c.getContext('2d'); c.width=img.naturalWidth; c.height=img.naturalHeight;
-      ctx.drawImage(img,0,0); var data=ctx.getImageData(0,0,c.width,c.height).data;
-      var r=0,g=0,b=0,count=0; for(var i=0;i<data.length;i+=16){ r+=data[i]; g+=data[i+1]; b+=data[i+2]; count++; }
-      r=Math.round(r/count); g=Math.round(g/count); b=Math.round(b/count);
-      return '#'+[r,g,b].map(x=>('0'+x.toString(16)).slice(-2)).join('');
-    }catch(e){ return null; }
-  }
-  async function smartExtract(rawUrl){
-    try{
-      if(!rawUrl) return;
-      var u = new URL(rawUrl); el('clickUrl').value = rawUrl;
-      var logos = urlsFrom(u.origin, ['/favicon.ico','/favicon.png','/apple-touch-icon.png','/logo.png','/assets/logo.png','/static/logo.png','/img/logo.png','/images/logo.png','/brand/logo.png']);
-      var heros = urlsFrom(u.origin, ['/og-image.jpg','/og-image.png','/banner.jpg','/banner.png','/images/hero.jpg','/images/kv.jpg']);
-      var L = await firstImage(logos); if(L && L.ok){ el('logoUrl').value=L.url; var dom=dominantColor(L.img); if(dom){ el('cBgColor').value=dom; } }
-      var H = await firstImage(heros); if(H && H.ok){ el('bgUrl').value=H.url; }
-      render();
-    }catch(e){ console.warn('smartExtract error',e); render(); }
-  }
-
-  // --------------- AI Copy variants ---------------
-  function addVariant(obj){
-    variants.push(obj); renderVariants();
-  }
-  function renderVariants(){
-    var v=el('variants'); v.innerHTML='';
-    if(variants.length===0){
-      // seed with 3 defaults based on current inputs
-      addVariant({type:'brand', h: 'Teplo do mrazu', s:'Funkční vrstvy 24/7', c:'Zjistit více'});
-      addVariant({type:'promo', h:'Sleva až 50 %', s:'Dnes doprava zdarma', c:'Nakoupit teď'});
-      addVariant({type:'produkt', h:'Nepromokavé bundy', s:'Nová kolekce na horách', c:'Prohlédnout'});
-      return;
-    }
-    variants.forEach(function(x,idx){
-      var card=document.createElement('div'); card.className='vcard';
-      card.innerHTML = '<div class="mini">'+x.type.toUpperCase()+'</div>\
-        <div class="grid2">\
-          <div><label>Headline</label><input data-i="'+idx+'" data-f="h" type="text" value="'+x.h+'"></div>\
-          <div><label>Subline</label><input data-i="'+idx+'" data-f="s" type="text" value="'+x.s+'"></div>\
-        </div>\
-        <div class="grid2" style="margin-top:6px">\
-          <div><label>CTA</label><input data-i="'+idx+'" data-f="c" type="text" value="'+x.c+'"></div>\
-          <div class="row" style="align-items:flex-end;justify-content:flex-end"><button class="btn ghost" data-act="apply" data-i="'+idx+'">Použít</button><button class="btn" data-act="del" data-i="'+idx+'">Smazat</button></div>\
-        </div>';
-      v.appendChild(card);
-    });
-    v.querySelectorAll('input').forEach(function(inp){
-      inp.addEventListener('input', function(e){
-        var i=parseInt(e.target.getAttribute('data-i'),10); var f=e.target.getAttribute('data-f'); variants[i][f]=e.target.value;
-      });
-    });
-    v.querySelectorAll('button').forEach(function(b){
-      b.addEventListener('click', function(e){
-        var act=e.target.getAttribute('data-act'); var i=parseInt(e.target.getAttribute('data-i'),10);
-        if(act==='apply'){ el('headline').value=variants[i].h; el('subline').value=variants[i].s; el('cta').value=variants[i].c; render(); }
-        if(act==='del'){ variants.splice(i,1); renderVariants(); }
       });
     });
   }
-  function variantFromKw(kw){
-    kw = (kw||'').toLowerCase();
-    var hasSale = /sleva|-%|percent|akce/.test(kw);
-    var hasTech = /nepromok|membr|softshell|gore|primaloft|hardshell|merino|outdoor/.test(kw);
-    var product = /bunda|kalhot|mikina|boty|rukavic/.test(kw) ? kw.split(',')[0].trim() : 'Nová kolekce';
-    var h = hasSale ? 'Sleva až 50 %' : (hasTech ? 'Spolehněte se na výkon' : product);
-    var s = hasSale ? 'Jen dnes doprava zdarma' : (hasTech ? 'Sucho a teplo v každém kroku' : 'Styl a funkčnost na každý den');
-    var c = hasSale ? 'Využít slevu' : (hasTech ? 'Zjistit víc' : 'Prohlédnout');
-    return {type:'custom', h:h, s:s, c:c};
-  }
 
-  // --------------- Contrast check (CTA) ---------------
-  function hexToRgb(hex){ var h=hex.replace('#',''); if(h.length===3){ h=h.split('').map(x=>x+x).join(''); } var n=parseInt(h,16); return {r:(n>>16)&255,g:(n>>8)&255,b:n&255}; }
-  function luminance(r,g,b){ r/=255; g/=255; b/=255; [r,g,b]=[r,g,b].map(v=> v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)); return 0.2126*r+0.7152*g+0.0722*b; }
-  function contrastRatio(hex1,hex2){ var a=luminance(...Object.values(hexToRgb(hex1))), b=luminance(...Object.values(hexToRgb(hex2))); var L1=Math.max(a,b)+0.05, L2=Math.min(a,b)+0.05; return L1/L2; }
+  // Uploads
+  var lf=document.getElementById('logoFile'); if(lf){ lf.addEventListener('change', async function(e){ var f=e.target.files&&e.target.files[0]; if(!f) return; try{ var d=await readFileAsDataURL(f); var u=document.getElementById('logoUrl'); if(u){ u.value=d; render(); } }catch(_){}}); }
+  var bf=document.getElementById('bgFile'); if(bf){ bf.addEventListener('change', async function(e){ var f=e.target.files&&e.target.files[0]; if(!f) return; try{ var d=await readFileAsDataURL(f); var u=document.getElementById('bgUrl'); if(u){ u.value=d; render(); } }catch(_){}}); }
+  var lu=document.getElementById('logoUrl'); if(lu){ lu.addEventListener('input', render); }
+  var bu=document.getElementById('bgUrl'); if(bu){ bu.addEventListener('input', render); }
 
-  // --------------- Export ZIP ----------------
-  function crc32(buf){ var table=(function(){var c,t=new Uint32Array(256);for(var n=0;n<256;n++){c=n;for(var k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0}return t;})(); var crc=0^(-1);for(var i=0;i<buf.length;i++)crc=(crc>>>8)^table[(crc^buf[i])&0xFF];return (crc^(-1))>>>0; }
-  function strToU8(s){return new TextEncoder().encode(s)}
-  function le(n,b){var a=new Uint8Array(b);for(var i=0;i<b;i++)a[i]=(n>>>(8*i))&0xFF;return a}
-  function cat(ch){var tot=0;ch.forEach(c=>tot+=c.length);var out=new Uint8Array(tot),o=0;ch.forEach(c=>{out.set(c,o);o+=c.length});return out}
-  function makeZip(files){
-    var locals=[],centrals=[],off=0,t=0,d=0;
-    files.forEach(f=>{
-      var name=strToU8(f.name); var data=f.data; var crc=crc32(data); var sz=data.length;
-      var lh=cat([strToU8('PK\\x03\\x04'),le(20,2),le(0,2),le(0,2),le(t,2),le(d,2),le(crc,4),le(sz,4),le(sz,4),le(name.length,2),le(0,2)]);
-      var local=cat([lh,name,data]); locals.push(local);
-      var ch=cat([strToU8('PK\\x01\\x02'),le(20,2),le(20,2),le(0,2),le(0,2),le(t,2),le(d,2),le(crc,4),le(sz,4),le(sz,4),le(name.length,2),le(0,2),le(0,2),le(0,2),le(0,2),le(0,4),le(off,4)]);
-      centrals.push(cat([ch,name])); off+=local.length;
-    });
-    var central=cat(centrals), localsCat=cat(locals);
-    var end=cat([strToU8('PK\\x05\\x06'),le(0,2),le(0,2),le(files.length,2),le(files.length,2),le(central.length,4),le(localsCat.length,4),le(0,2)]);
-    return new Blob([localsCat,central,end],{type:'application/zip'});
-  }
-  function minify(str){ return String(str).replace(/\\n+/g,'').replace(/\\s{2,}/g,' '); }
+  // Anim controls
+  document.getElementById('animToggle').addEventListener('click', function(){ if(isPlaying) pauseAnimations(); else { applyPreviewAnim(); playAnimations(); } });
+  var hdrBtn=document.getElementById('animToggleHdr'); if(hdrBtn){ hdrBtn.addEventListener('click', function(){ if(isPlaying) pauseAnimations(); else { applyPreviewAnim(); playAnimations(); } }); }
+  var replay=document.getElementById('replayAll'); if(replay){ replay.addEventListener('click', function(){ applyPreviewAnim(); if(isPlaying) playAnimations(); }); }
+  document.getElementById('animPreset').addEventListener('change', function(){ applyPreviewAnim(); });
+  document.getElementById('animDur').addEventListener('change', function(){ applyPreviewAnim(); });
+  document.getElementById('animLoops').addEventListener('change', function(){ applyPreviewAnim(); });
 
-  function int(n){ return Math.round(n); }
-  function htmlForSize(w,h, opts){
-    var tr=state[w+'x'+h];
-    var anim = presetCss(opts.animPreset, opts.animDur);
-    var loops = Math.min(3, parseInt(opts.animLoops,10)||1);
-    var stopAfter = Math.min(30, (loops*((parseFloat(opts.animDur)||2)+0.6))); // seconds
-    var fontFace = opts.fontDataUrl ? ('@font-face{font-family:CustomFont;src:url('+opts.fontDataUrl+') format(\"'+(opts.fontDataUrl.split(';')[0].endsWith('woff2')?'woff2':'woff')+'\");font-weight:normal;font-style:normal;font-display:swap}') : '';
-    var hFont = (opts.hFont==='Inter'&&opts.fontDataUrl)?'CustomFont':opts.hFont;
-    var sFont = (opts.sFont==='Inter'&&opts.fontDataUrl)?'CustomFont':opts.sFont;
-    var cFont = (opts.cFont==='Inter'&&opts.fontDataUrl)?'CustomFont':opts.cFont;
-    var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'+
-      '<meta name="ad.size" content="width='+w+',height='+h+'">'+
-      '<title>banner</title>'+
-      '<style>'+fontFace+
-      ':root{--w:'+w+'px;--h:'+h+'px}*{box-sizing:border-box}html,body{margin:0;width:var(--w);height:var(--h);overflow:hidden}'+
-      '.banner{position:relative;width:var(--w);height:var(--h);background:'+opts.bgCss+';color:#fff;font-family:Arial,Helvetica,sans-serif;overflow:hidden}'+
-      '.headline{position:absolute;left:50%;top:45%;transform:translate(calc(-50% + '+tr.h.x+'px), calc(-50% + '+tr.h.y+'px));width:calc(var(--w) - 40px);text-align:center;font-weight:800;line-height:1.1;font-size:'+tr.h.size+'px;color:'+tr.h.color+';font-family:'+hFont+'}'+
-      '.subline{position:absolute;left:50%;top:63%;transform:translate(calc(-50% + '+tr.s.x+'px), calc(-50% + '+tr.s.y+'px));width:calc(var(--w) - 50px);text-align:center;font-weight:500;line-height:1.2;font-size:'+tr.s.size+'px;color:'+tr.s.color+';font-family:'+sFont+'}'+
-      '.cta{position:absolute;left:50%;bottom:'+Math.max(8,int(h*0.05)-tr.c.y)+'px;transform:translate(calc(-50% + '+tr.c.x+'px));padding:'+Math.max(4,int(h*0.04))+'px '+Math.max(8,int(w*0.04))+'px;border-radius:999px;background:'+tr.c.bgColor+';color:'+tr.c.textColor+';font-weight:800;font-size:'+tr.c.size+'px;letter-spacing:.2px;font-family:'+cFont+';box-shadow:0 6px 14px rgba(0,0,0,.22)}'+
-      '.logo{position:absolute;left:10px;top:10px;transform:translate('+tr.logoX+'px,'+tr.logoY+'px) scale('+tr.logoScale+');height:'+int(h*0.12)+'px;width:auto;opacity:.95}'+
-      (opts.bgUrl?'.bg{position:absolute;left:50%;top:50%;transform:translate(calc(-50% + '+tr.bgX+'px), calc(-50% + '+tr.bgY+'px)) scale('+tr.bgScale+');transform-origin:center center;height:110%;min-width:110%;opacity:.95;z-index:0}':'')+
-      anim+
-      '</style><script>window.clickTag='+JSON.stringify(opts.clickUrl)+';setTimeout(function(){var b=document.querySelectorAll(\".headline,.subline,.cta,img\");for(var i=0;i<b.length;i++){b[i].style.animationIterationCount=\"'+loops+'\";}},0);setTimeout(function(){var b=document.querySelectorAll(\".headline,.subline,.cta,img\");for(var i=0;i<b.length;i++){b[i].style.animationPlayState=\"paused\";}},'+int(stopAfter*1000)+');<\/script></head><body>'+
-      '<a href="javascript:window.open(window.clickTag)" style="text-decoration:none"><div class="banner">'+
-      (opts.bgUrl?'<img class="bg" src="'+opts.bgUrl+'" alt="bg"/>':'')+
-      '<div class="headline">'+opts.headline+'</div>'+
-      '<div class="subline">'+opts.subline+'</div>'+
-      '<div class="cta">'+opts.cta+'</div>'+
-      (opts.logoUrl?'<img class="logo" src="'+opts.logoUrl+'" alt="logo"/>':'')+
-      '</div></a></body></html>';
-    return minify(html);
-  }
-
-  function totalAnimDuration(){
-    var loops=parseInt(el('animLoops').value,10)||1;
-    var d=parseFloat(el('animDur').value)||2;
-    return loops*(d+0.6);
-  }
-
-  function buildFiles(opts){
-    var files = [];
-    activeSizes().forEach(function(s){
-      var html = htmlForSize(s.w,s.h, opts);
-      files.push({name: s.w+'x'+s.h+'/index.html', data: strToU8(html)});
-    });
-    return files;
-  }
-
+  // Export ZIP (single zip, all sizes)
   function exportZip(){
-    var strict = el('strictExport').checked;
-    var cr = contrastRatio(el('cTextColor').value, el('cBgColor').value);
-    if(cr < 3){ if(!confirm('Kontrast CTA text vs. pozadí je nízký (ratio '+cr.toFixed(2)+'). Pokračovat?')) return; }
+    var clickUrl = el('clickUrl').value || 'https://example.com';
+    var zip = new JSZip();
 
-    var opts = {
-      headline: el('headline').value, subline: el('subline').value, cta: el('cta').value,
-      clickUrl: el('clickUrl').value,
-      bgCss: el('bg').value,
-      logoUrl: inlineLogoData || el('logoUrl').value, bgUrl: inlineBgData || el('bgUrl').value,
-      animPreset: el('animPreset').value, animDur: el('animDur').value, animLoops: el('animLoops').value,
-      fontDataUrl: fontDataUrl,
-      hFont: el('hFont').value, sFont: el('sFont').value, cFont: el('cFont').value
-    };
+    activeSizes().forEach(function(s){
+      var st=state[s.key];
+      var folder=zip.folder(s.key);
+      var html = `<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="ad.size" content="width=${s.w},height=${s.h}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${s.key}</title>
+  <style>
+    html,body{margin:0;padding:0}
+    .wrap{position:relative;width:${s.w}px;height:${s.h}px;overflow:hidden;background:${st.bgUrl?'url('+st.bgUrl+') center/cover':'linear-gradient(180deg,#17324F,#0A1A2B)'};font-family:Arial,Helvetica,sans-serif;color:#fff}
+    .logo{position:absolute;left:0;top:0;transform:translate(${st.logoX}px,${st.logoY}px) scale(${st.logoScale});max-width:40%;max-height:40%}
+    .h{position:absolute;left:50%;top:40%;transform:translate(calc(-50% + ${st.h.x}px), calc(-50% + ${st.h.y}px));color:${el('hColor').value};font-weight:800;font-size:${st.h.size||28}px;white-space:nowrap}
+    .s{position:absolute;left:50%;top:55%;transform:translate(calc(-50% + ${st.s.x}px), calc(-50% + ${st.s.y}px));color:${el('sColor').value};font-weight:600;font-size:${st.s.size||16}px;white-space:nowrap}
+    .c{position:absolute;left:50%;top:75%;transform:translate(calc(-50% + ${st.c.x}px), calc(-50% + ${st.c.y}px));color:${el('cTextColor').value};background:${el('cBgColor').value};font-weight:700;border-radius:20px;padding:8px 14px;font-size:${st.c.size||16}px}
+    a.click{position:absolute;inset:0;display:block;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    ${st.logoUrl?'<img class="logo" src="'+st.logoUrl+'" alt="logo">':''}
+    <div class="h">${escapeHtml(el('headline').value||'')}</div>
+    <div class="s">${escapeHtml(el('subline').value||'')}</div>
+    <div class="c">${escapeHtml(el('cta').value||'')}</div>
+    <a class="click" href="javascript:window.open(window.clickTag)"></a>
+  </div>
+  <script>window.clickTag="${clickUrl.replace('"','%22')}";</script>
+</body>
+</html>`;
+      folder.file("index.html", html);
+    });
 
-    // Strict export: vyžaduj inline (data URL) pro logo/bg, jinak varuj
-    if(strict){
-      if(!(/^data:image/.test(opts.logoUrl||'')) && (opts.logoUrl||'').length>0){ alert('Strict export: nahraj logo jako soubor (aby bylo inline v ZIPu).'); return; }
-      if(!(/^data:image/.test(opts.bgUrl||'')) && (opts.bgUrl||'').length>0){ alert('Strict export: nahraj pozadí/produkt jako soubor (inline).'); return; }
-    }
-
-    var files = buildFiles(opts);
-    if(files.length>40){ alert('Překročeno 40 souborů v ZIPu. Zruš některé rozměry.'); return; }
-    var total = files.reduce((a,f)=>a+f.data.length,0);
-    if(strict && total>150*1024){ alert('Strict export: odhad ZIPu přesahuje 150 kB ('+Math.round(total/1024)+' kB). Zmenši obrázky nebo sniž počet rozměrů.'); return; }
-    if(totalAnimDuration()>30){ alert('Celková doba animace by překročila 30 s. Uprav délku/počet loopů.'); return; }
-
-    var blob = makeZip(files);
-    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='html5ai-banners.zip'; a.click();
+    zip.generateAsync({type:"blob"}).then(function(content){
+      saveAs(content, "ads_all_sizes_html5.zip");
+    });
   }
 
-  // --------------- Validator ---------------
-  function validate(){
-    var issues=[];
-    var animT=totalAnimDuration(); if(animT>30) issues.push({level:'error',msg:'Animace > 30 s'});
-    var badge=el('badge');
-    var list=el('issues'); list.innerHTML='';
-    if(issues.length===0){ badge.className='badge ok'; badge.textContent='OK — připraveno k exportu'; }
-    else{ var err=issues.some(i=>i.level==='error'); badge.className='badge '+(err?'err':'warn'); badge.textContent=err?'Problémy — zkontroluj níže':'Varování'; issues.forEach(function(i){ var li=document.createElement('li'); li.textContent='['+i.level.toUpperCase()+'] '+i.msg; list.appendChild(li); }); }
-  }
+  function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function validate(){ var badge=el('badge'); badge.className='badge ok'; badge.textContent='OK — připraveno k exportu'; }
+  function on(id,ev,fn){ var x=document.getElementById(id); if(x) x.addEventListener(ev,fn); }
+  on('exportZip','click', exportZip); on('exportZipTop','click', exportZip);
 
-  // --------------- Events ---------------
-  ['headline','subline','cta','clickUrl','bg','hSize','hColor','hFont','sSize','sColor','sFont','cSize','cTextColor','cBgColor','cFont','animPreset','animDur','animLoops'].forEach(function(id){
-    on(id,'input', function(){ render(); });
-    on(id,'change', function(){ render(); });
+  document.addEventListener('DOMContentLoaded', function(){ render(); pauseAnimations(); }, false);
+
+  on('newProject','click', function(){
+    Object.keys(state).forEach(function(k){
+      state[k]={ bgUrl:'',logoUrl:'', bgX:0,bgY:0,bgScale:1, logoX:0,logoY:0,logoScale:1, h:{x:0,y:0,size:28}, s:{x:0,y:0,size:16}, c:{x:0,y:0,size:16} };
+    });
+    el('headline').value='Teplo do mrazu'; el('subline').value='Funkční vrstvy 24/7'; el('cta').value='Zjistit více';
+    el('logoUrl').value=''; el('bgUrl').value=''; render();
   });
-  on('logoFile','change', function(e){ readFileToUrl(e.target, function(url){ el('logoUrl').value=url; inlineLogoData=url; render(); }); });
-  on('bgFile','change', function(e){ readFileToUrl(e.target, function(url){ el('bgUrl').value=url; inlineBgData=url; render(); }); });
-  on('fontFile','change', function(e){ readFileToUrl(e.target, function(url){ fontDataUrl=url; render(); }); });
-  on('importUrl','click', function(){ smartExtract(el('brandUrl').value||''); });
-  on('exportZip','click', exportZip);
-  on('exportZipTop','click', exportZip);
-  on('replayAll','click', function(){ applyPreviewAnim(); render(); });
-
-  on('genKw','click', function(){
-    var v = variantFromKw(el('kw').value||''); addVariant(v);
-  });
-
-  document.addEventListener('DOMContentLoaded', function(){ render(); renderVariants(); }, false);
 })();
