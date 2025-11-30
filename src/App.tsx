@@ -12,6 +12,7 @@ import { useAppStore } from '@/stores/app-store'
 import { platforms, getFormatKey, getCategoryType, isBrandingCategory, isVideoCategory, getMaxSizeKB, parseFormatKey } from '@/lib/platforms'
 import { generateId, cn, loadImage, drawRoundedRect } from '@/lib/utils'
 import { isR2Configured, uploadCreativesToR2Batch } from '@/lib/r2-storage'
+import { outpaintImage } from '@/lib/openai-client'
 import { Sidebar, NavigationView } from '@/components/Sidebar'
 import { SettingsModal } from '@/components/SettingsModal'
 import { FormatCard } from '@/components/FormatCard'
@@ -123,7 +124,7 @@ export default function App() {
     brandKits,
     activeBrandKit,
     cropMode,
-    imageOffset,
+    formatOffsets,
     r2Config,
     setPlatform,
     setCategory,
@@ -554,14 +555,17 @@ export default function App() {
         const srcRatio = img.width / img.height
         const tgtRatio = fmt.width / fmt.height
         
+        // Získej offset pro tento konkrétní formát
+        const formatOffset = formatOffsets[formatKey] || { x: 0, y: 0 }
+        
         // Aplikuj ruční offset (v procentech, -50 až +50)
         const applyOffset = (crop: typeof cropResult) => {
           // Offset v pixelech - proporcionálně k velikosti cropu
           const maxOffsetX = (img.width - crop.width) / 2
           const maxOffsetY = (img.height - crop.height) / 2
           
-          const offsetX = (imageOffset.x / 50) * maxOffsetX
-          const offsetY = (imageOffset.y / 50) * maxOffsetY
+          const offsetX = (formatOffset.x / 50) * maxOffsetX
+          const offsetY = (formatOffset.y / 50) * maxOffsetY
           
           return {
             ...crop,
@@ -572,7 +576,7 @@ export default function App() {
         
         if (cropMode === 'fit') {
           // FIT režim: zachovat celý obrázek, přidat padding pokud potřeba
-          // Obrázek se vejde celý do canvasu (letterbox/pillarbox efekt)
+          // Nebo použít AI outpainting pro rozšíření
           let drawWidth = fmt.width
           let drawHeight = fmt.height
           let drawX = 0
@@ -590,16 +594,56 @@ export default function App() {
             drawX = (fmt.width - drawWidth) / 2
           }
           
-          // Pozadí (bílé nebo z brand kit)
-          ctx.fillStyle = currentBrandKit?.backgroundColor || '#ffffff'
-          ctx.fillRect(0, 0, fmt.width, fmt.height)
+          // Detekuj zda je potřeba outpainting (prázdné místo > 15%)
+          const emptyRatio = 1 - (drawWidth * drawHeight) / (fmt.width * fmt.height)
+          const needsOutpainting = emptyRatio > 0.15 && apiKeys.openai
           
-          // Aplikuj offset na pozici v FIT režimu
-          const fitOffsetX = (imageOffset.x / 50) * ((fmt.width - drawWidth) / 2)
-          const fitOffsetY = (imageOffset.y / 50) * ((fmt.height - drawHeight) / 2)
-          
-          // Nakresli obrázek zachovaný celý
-          ctx.drawImage(img, 0, 0, img.width, img.height, drawX + fitOffsetX, drawY + fitOffsetY, drawWidth, drawHeight)
+          if (needsOutpainting) {
+            // Zkus AI outpainting pro rozšíření obrázku
+            try {
+              const outpaintResult = await outpaintImage(
+                { apiKey: apiKeys.openai },
+                {
+                  image: sourceImage,
+                  targetWidth: fmt.width,
+                  targetHeight: fmt.height,
+                  prompt: prompt ? `Continue the background: ${prompt}` : undefined,
+                }
+              )
+              
+              if (outpaintResult.success && outpaintResult.image) {
+                // Použij outpaintovaný obrázek
+                const outpaintedImg = await loadImage(outpaintResult.image)
+                ctx.drawImage(outpaintedImg, 0, 0, fmt.width, fmt.height)
+              } else {
+                // Fallback - blur fill pozadí
+                ctx.filter = 'blur(25px)'
+                ctx.drawImage(img, -15, -15, fmt.width + 30, fmt.height + 30)
+                ctx.filter = 'none'
+                ctx.fillStyle = 'rgba(0,0,0,0.15)'
+                ctx.fillRect(0, 0, fmt.width, fmt.height)
+                
+                const fitOffsetX = (formatOffset.x / 50) * ((fmt.width - drawWidth) / 2)
+                const fitOffsetY = (formatOffset.y / 50) * ((fmt.height - drawHeight) / 2)
+                ctx.drawImage(img, 0, 0, img.width, img.height, drawX + fitOffsetX, drawY + fitOffsetY, drawWidth, drawHeight)
+              }
+            } catch {
+              // Fallback na normální FIT
+              ctx.fillStyle = currentBrandKit?.backgroundColor || '#ffffff'
+              ctx.fillRect(0, 0, fmt.width, fmt.height)
+              const fitOffsetX = (formatOffset.x / 50) * ((fmt.width - drawWidth) / 2)
+              const fitOffsetY = (formatOffset.y / 50) * ((fmt.height - drawHeight) / 2)
+              ctx.drawImage(img, 0, 0, img.width, img.height, drawX + fitOffsetX, drawY + fitOffsetY, drawWidth, drawHeight)
+            }
+          } else {
+            // Normální FIT bez outpaintingu
+            ctx.fillStyle = currentBrandKit?.backgroundColor || '#ffffff'
+            ctx.fillRect(0, 0, fmt.width, fmt.height)
+            
+            const fitOffsetX = (formatOffset.x / 50) * ((fmt.width - drawWidth) / 2)
+            const fitOffsetY = (formatOffset.y / 50) * ((fmt.height - drawHeight) / 2)
+            ctx.drawImage(img, 0, 0, img.width, img.height, drawX + fitOffsetX, drawY + fitOffsetY, drawWidth, drawHeight)
+          }
         } else if (catType === 'image' && cropMode === 'smart') {
           // SMART režim: inteligentní ořez
           try {
@@ -1258,8 +1302,9 @@ function drawTextOverlay(
   // Detect banner aspect ratio for smart sizing
   const aspectRatio = width / height
   const isWide = aspectRatio > 2.5  // Leaderboard, Billboard (970x90, 970x250)
-  const isTall = aspectRatio < 0.5  // Skyscraper, Half Page (160x600, 300x600)
-  const isSquarish = aspectRatio >= 0.5 && aspectRatio <= 2.5
+  const isTall = aspectRatio < 0.6  // Skyscraper, Half Page (160x600, 300x600)
+  const isSmall = width <= 320 || height <= 100  // Mobile Banner, small formats
+  const isVerySmall = width <= 200 || height <= 60
 
   const padding = Math.min(width, height) * 0.06
   const fontFamily = brandKit?.headlineFont || 'Arial, Helvetica, sans-serif'
@@ -1267,38 +1312,44 @@ function drawTextOverlay(
   const ctaColor = overlay.ctaColor || brandKit?.ctaColor || '#ff6600'
 
   // Smart font sizing based on banner dimensions
-  // For wide banners: use height as base but ensure readability
-  // For tall banners: use width as base
-  // For square-ish: use smaller dimension
   let baseSize: number
-  if (isWide) {
-    baseSize = height * 0.9  // Wide banners - use most of height
+  if (isVerySmall) {
+    baseSize = Math.min(width, height) * 1.2
+  } else if (isSmall) {
+    baseSize = Math.min(width, height) * 1.0
+  } else if (isWide) {
+    baseSize = height * 0.85
   } else if (isTall) {
-    baseSize = width * 0.8   // Tall banners - use most of width
+    baseSize = width * 0.7
   } else {
-    baseSize = Math.min(width, height)
+    baseSize = Math.min(width, height) * 0.8
   }
 
   // Font size multipliers based on overlay.fontSize setting
   const sizeMultipliers = {
     small: { headline: 0.18, sub: 0.12, cta: 0.10 },
     medium: { headline: 0.24, sub: 0.15, cta: 0.12 },
-    large: { headline: 0.32, sub: 0.18, cta: 0.14 },
+    large: { headline: 0.30, sub: 0.18, cta: 0.14 },
   }
   const multiplier = sizeMultipliers[overlay.fontSize] || sizeMultipliers.medium
   
-  // Calculate actual font sizes with min/max bounds
+  // Calculate actual font sizes with appropriate min/max bounds
   const size = {
-    headline: Math.max(12, Math.min(baseSize * multiplier.headline, 72)),
-    sub: Math.max(10, Math.min(baseSize * multiplier.sub, 48)),
-    cta: Math.max(9, Math.min(baseSize * multiplier.cta, 36)),
+    headline: Math.max(10, Math.min(baseSize * multiplier.headline, 64)),
+    sub: Math.max(8, Math.min(baseSize * multiplier.sub, 40)),
+    cta: Math.max(8, Math.min(baseSize * multiplier.cta, 28)),
   }
+
+  // Pro malé formáty - jen CTA nebo jen headline
+  const showHeadline = !isVerySmall
+  const showSubheadline = !isSmall && !isWide
+  const showCta = overlay.cta && size.cta >= 8
 
   // Calculate total text block height
   let blockHeight = 0
-  if (overlay.headline) blockHeight += size.headline * 1.3
-  if (overlay.subheadline) blockHeight += size.sub * 1.4
-  if (overlay.cta) blockHeight += size.cta * 2.8
+  if (showHeadline && overlay.headline) blockHeight += size.headline * 1.3
+  if (showSubheadline && overlay.subheadline) blockHeight += size.sub * 1.4
+  if (showCta) blockHeight += size.cta * 2.5
 
   // For wide banners, stack horizontally if needed
   const useHorizontalLayout = isWide && blockHeight > height * 0.8
@@ -1379,7 +1430,7 @@ function drawTextOverlay(
   let currentY = y
 
   // Draw headline
-  if (overlay.headline) {
+  if (showHeadline && overlay.headline) {
     ctx.font = `bold ${Math.round(size.headline)}px ${fontFamily}`
     ctx.fillStyle = textColor
     
@@ -1390,19 +1441,73 @@ function drawTextOverlay(
     ctx.shadowOffsetY = 1
     
     ctx.textBaseline = 'top'
-    ctx.fillText(overlay.headline, x, currentY)
-    currentY += size.headline * 1.3
+    
+    // Word wrap for tall/narrow formats
+    if (isTall) {
+      const words = overlay.headline.split(' ')
+      const maxWidth = width - padding * 2
+      let line = ''
+      const lines: string[] = []
+      
+      for (const word of words) {
+        const testLine = line ? `${line} ${word}` : word
+        const metrics = ctx.measureText(testLine)
+        if (metrics.width > maxWidth && line) {
+          lines.push(line)
+          line = word
+        } else {
+          line = testLine
+        }
+      }
+      if (line) lines.push(line)
+      
+      for (const lineText of lines) {
+        ctx.fillText(lineText, x, currentY)
+        currentY += size.headline * 1.2
+      }
+      currentY += size.headline * 0.1
+    } else {
+      ctx.fillText(overlay.headline, x, currentY)
+      currentY += size.headline * 1.3
+    }
   }
 
-  // Draw subheadline (skip for very wide banners to save space)
-  if (overlay.subheadline && !useHorizontalLayout) {
+  // Draw subheadline (skip for small or wide banners)
+  if (showSubheadline && overlay.subheadline) {
     ctx.font = `${Math.round(size.sub)}px ${fontFamily}`
     ctx.fillStyle = textColor
     ctx.shadowColor = 'rgba(0,0,0,0.6)'
     ctx.shadowBlur = Math.max(1, size.sub * 0.08)
     ctx.textBaseline = 'top'
-    ctx.fillText(overlay.subheadline, x, currentY)
-    currentY += size.sub * 1.4
+    
+    // Word wrap for tall formats
+    if (isTall) {
+      const words = overlay.subheadline.split(' ')
+      const maxWidth = width - padding * 2
+      let line = ''
+      const lines: string[] = []
+      
+      for (const word of words) {
+        const testLine = line ? `${line} ${word}` : word
+        const metrics = ctx.measureText(testLine)
+        if (metrics.width > maxWidth && line) {
+          lines.push(line)
+          line = word
+        } else {
+          line = testLine
+        }
+      }
+      if (line) lines.push(line)
+      
+      for (const lineText of lines) {
+        ctx.fillText(lineText, x, currentY)
+        currentY += size.sub * 1.2
+      }
+      currentY += size.sub * 0.2
+    } else {
+      ctx.fillText(overlay.subheadline, x, currentY)
+      currentY += size.sub * 1.4
+    }
   }
 
   // Reset shadow before CTA
@@ -1411,34 +1516,49 @@ function drawTextOverlay(
   ctx.shadowOffsetX = 0
   ctx.shadowOffsetY = 0
 
-  // Draw CTA Button (skip for very small banners)
-  if (overlay.cta && size.cta >= 9) {
+  // Draw CTA Button
+  if (showCta && overlay.cta) {
     ctx.font = `bold ${Math.round(size.cta)}px ${fontFamily}`
     const ctaTextWidth = ctx.measureText(overlay.cta).width
-    const ctaPaddingX = size.cta * 0.8
-    const ctaPaddingY = size.cta * 0.4
+    const ctaPaddingX = Math.max(size.cta * 0.6, 6)
+    const ctaPaddingY = Math.max(size.cta * 0.35, 4)
     const ctaWidth = ctaTextWidth + ctaPaddingX * 2
     const ctaHeight = size.cta + ctaPaddingY * 2
-    const ctaRadius = Math.min(ctaHeight / 2, 8)
+    const ctaRadius = Math.min(ctaHeight / 2.5, 6)
 
+    // Make sure CTA fits in the banner
+    const maxCtaWidth = width - padding * 2
+    const scaledCtaWidth = Math.min(ctaWidth, maxCtaWidth)
+    
     // Calculate CTA X position based on alignment
     let ctaX = x
     if (align === 'center') {
-      ctaX = x - ctaWidth / 2
+      ctaX = x - scaledCtaWidth / 2
     } else if (align === 'right') {
-      ctaX = x - ctaWidth
+      ctaX = x - scaledCtaWidth
     }
+
+    // Ensure CTA doesn't overflow
+    ctaX = Math.max(padding / 2, Math.min(ctaX, width - scaledCtaWidth - padding / 2))
+    currentY = Math.min(currentY, height - ctaHeight - padding / 2)
 
     // Draw button background
     ctx.fillStyle = ctaColor
-    drawRoundedRect(ctx, ctaX, currentY, ctaWidth, ctaHeight, ctaRadius)
+    drawRoundedRect(ctx, ctaX, currentY, scaledCtaWidth, ctaHeight, ctaRadius)
     ctx.fill()
 
     // Draw button text (centered in button)
     ctx.fillStyle = '#ffffff'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(overlay.cta, ctaX + ctaWidth / 2, currentY + ctaHeight / 2)
+    
+    // Scale font if text is too wide
+    if (ctaTextWidth > scaledCtaWidth - ctaPaddingX * 2) {
+      const scaleFactor = (scaledCtaWidth - ctaPaddingX * 2) / ctaTextWidth
+      ctx.font = `bold ${Math.round(size.cta * scaleFactor)}px ${fontFamily}`
+    }
+    
+    ctx.fillText(overlay.cta, ctaX + scaledCtaWidth / 2, currentY + ctaHeight / 2)
   }
 
   // Reset context

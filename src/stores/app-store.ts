@@ -67,12 +67,15 @@ export const useAppStore = create<AppState>()(
       sourceVariants: [] as SourceImageVariant[],
       activeSourceVariant: null as string | null,
       cropMode: 'smart' as 'smart' | 'fit', // smart = Smart Crop, fit = zachovat celý obrázek
-      imageOffset: { x: 0, y: 0 },  // Ruční posun v procentech
+      formatOffsets: {} as Record<string, { x: number; y: number }>,  // Per-format posun v procentech
       setPrompt: (prompt) => set({ prompt }),
       setSourceFormat: (format) => set({ sourceFormat: format }),
-      setSourceImage: (image) => set({ sourceImage: image, imageOffset: { x: 0, y: 0 } }), // Reset offset při novém obrázku
+      setSourceImage: (image) => set({ sourceImage: image, formatOffsets: {} }), // Reset offsets při novém obrázku
       setCropMode: (mode) => set({ cropMode: mode }),
-      setImageOffset: (offset) => set({ imageOffset: offset }),
+      setFormatOffset: (formatKey, offset) => set((state) => {
+        state.formatOffsets[formatKey] = offset
+      }),
+      resetFormatOffsets: () => set({ formatOffsets: {} }),
       setSourceVariants: (variants) => set({ sourceVariants: variants }),
       addSourceVariant: (variant) =>
         set((state) => {

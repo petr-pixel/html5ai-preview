@@ -416,12 +416,13 @@ export interface AppState {
   sourceVariants: SourceImageVariant[]
   activeSourceVariant: string | null
   cropMode: 'smart' | 'fit'
-  imageOffset: { x: number; y: number }  // Ruční posun obrázku v procentech (-50 až 50)
+  formatOffsets: Record<string, { x: number; y: number }>  // Per-format posun obrázku v procentech (-50 až 50)
   setPrompt: (prompt: string) => void
   setSourceFormat: (format: 'landscape' | 'square' | 'portrait') => void
   setSourceImage: (image: string | null) => void
   setCropMode: (mode: 'smart' | 'fit') => void
-  setImageOffset: (offset: { x: number; y: number }) => void
+  setFormatOffset: (formatKey: string, offset: { x: number; y: number }) => void
+  resetFormatOffsets: () => void
   setSourceVariants: (variants: SourceImageVariant[]) => void
   addSourceVariant: (variant: SourceImageVariant) => void
   setActiveSourceVariant: (id: string | null) => void

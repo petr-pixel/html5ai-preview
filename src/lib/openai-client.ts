@@ -550,3 +550,228 @@ export async function generateImageVariants(
 
   return { success: true, images: results, cost: totalCost }
 }
+
+// ============================================================================
+// DALL-E 2 OUTPAINTING (pro rozšíření obrázku)
+// ============================================================================
+
+export interface OutpaintingParams {
+  image: string // base64 data URL
+  targetWidth: number
+  targetHeight: number
+  prompt?: string // popis pozadí
+}
+
+export interface OutpaintingResult {
+  success: boolean
+  image?: string // base64 data URL
+  error?: string
+  usedFallback?: boolean
+}
+
+/**
+ * Rozšíří obrázek pomocí DALL-E 2 edit API
+ * Pokud DALL-E selže, použije blur fill jako fallback
+ */
+export async function outpaintImage(
+  config: OpenAIConfig,
+  params: OutpaintingParams
+): Promise<OutpaintingResult> {
+  try {
+    // Vytvoř canvas pro přípravu obrázku a masky
+    const img = await loadImageFromDataUrl(params.image)
+    
+    const srcRatio = img.width / img.height
+    const tgtRatio = params.targetWidth / params.targetHeight
+    
+    // Určíme kam umístit zdrojový obrázek a kde je potřeba dogenerovat
+    let drawX = 0
+    let drawY = 0
+    let drawWidth = params.targetWidth
+    let drawHeight = params.targetHeight
+    
+    if (srcRatio > tgtRatio) {
+      // Zdrojový je širší - potřebujeme rozšířit nahoru/dolů
+      drawWidth = params.targetWidth
+      drawHeight = params.targetWidth / srcRatio
+      drawY = (params.targetHeight - drawHeight) / 2
+    } else {
+      // Zdrojový je vyšší - potřebujeme rozšířit doleva/doprava
+      drawHeight = params.targetHeight
+      drawWidth = params.targetHeight * srcRatio
+      drawX = (params.targetWidth - drawWidth) / 2
+    }
+    
+    // DALL-E 2 podporuje jen 1024x1024, 512x512, 256x256
+    const dalleSize = 1024
+    const scale = dalleSize / Math.max(params.targetWidth, params.targetHeight)
+    
+    // Vytvoř scaled canvas pro DALL-E
+    const canvas = document.createElement('canvas')
+    canvas.width = dalleSize
+    canvas.height = dalleSize
+    const ctx = canvas.getContext('2d')!
+    
+    // Vyplň průhledností (DALL-E dogeneruje průhledné oblasti)
+    ctx.clearRect(0, 0, dalleSize, dalleSize)
+    
+    // Nakresli zdrojový obrázek do středu
+    const scaledDrawX = drawX * scale + (dalleSize - params.targetWidth * scale) / 2
+    const scaledDrawY = drawY * scale + (dalleSize - params.targetHeight * scale) / 2
+    const scaledDrawWidth = drawWidth * scale
+    const scaledDrawHeight = drawHeight * scale
+    
+    ctx.drawImage(img, scaledDrawX, scaledDrawY, scaledDrawWidth, scaledDrawHeight)
+    
+    // Vytvoř masku - bílá = dogenerovat, černá = zachovat
+    const maskCanvas = document.createElement('canvas')
+    maskCanvas.width = dalleSize
+    maskCanvas.height = dalleSize
+    const maskCtx = maskCanvas.getContext('2d')!
+    
+    // Vyplň bílou (dogenerovat vše)
+    maskCtx.fillStyle = '#ffffff'
+    maskCtx.fillRect(0, 0, dalleSize, dalleSize)
+    
+    // Černá oblast kde je obrázek (zachovat)
+    maskCtx.fillStyle = '#000000'
+    maskCtx.fillRect(scaledDrawX, scaledDrawY, scaledDrawWidth, scaledDrawHeight)
+    
+    // Konvertuj na PNG blob
+    const imageBlob = await canvasToBlob(canvas, 'image/png')
+    const maskBlob = await canvasToBlob(maskCanvas, 'image/png')
+    
+    // Zavolej DALL-E 2 edit API
+    const formData = new FormData()
+    formData.append('image', imageBlob, 'image.png')
+    formData.append('mask', maskBlob, 'mask.png')
+    formData.append('prompt', params.prompt || 'Continue the background seamlessly, matching the style and colors')
+    formData.append('model', 'dall-e-2')
+    formData.append('n', '1')
+    formData.append('size', '1024x1024')
+    
+    const response = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: formData,
+    })
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      console.warn('DALL-E 2 outpainting failed:', error)
+      // Fallback na blur fill
+      return blurFillFallback(params)
+    }
+    
+    const data = await response.json()
+    const resultB64 = data.data?.[0]?.b64_json
+    
+    if (!resultB64) {
+      return blurFillFallback(params)
+    }
+    
+    // Resize zpět na cílovou velikost
+    const resultImg = await loadImageFromDataUrl(`data:image/png;base64,${resultB64}`)
+    
+    const finalCanvas = document.createElement('canvas')
+    finalCanvas.width = params.targetWidth
+    finalCanvas.height = params.targetHeight
+    const finalCtx = finalCanvas.getContext('2d')!
+    
+    // Crop jen požadovanou oblast z DALL-E výstupu
+    const cropX = (dalleSize - params.targetWidth * scale) / 2
+    const cropY = (dalleSize - params.targetHeight * scale) / 2
+    const cropWidth = params.targetWidth * scale
+    const cropHeight = params.targetHeight * scale
+    
+    finalCtx.drawImage(
+      resultImg, 
+      cropX, cropY, cropWidth, cropHeight,
+      0, 0, params.targetWidth, params.targetHeight
+    )
+    
+    return {
+      success: true,
+      image: finalCanvas.toDataURL('image/png'),
+    }
+  } catch (error: any) {
+    console.error('Outpainting error:', error)
+    return blurFillFallback(params)
+  }
+}
+
+/**
+ * Fallback - použije rozmazané pozadí místo AI outpaintingu
+ */
+async function blurFillFallback(params: OutpaintingParams): Promise<OutpaintingResult> {
+  try {
+    const img = await loadImageFromDataUrl(params.image)
+    
+    const canvas = document.createElement('canvas')
+    canvas.width = params.targetWidth
+    canvas.height = params.targetHeight
+    const ctx = canvas.getContext('2d')!
+    
+    const srcRatio = img.width / img.height
+    const tgtRatio = params.targetWidth / params.targetHeight
+    
+    // Nejdřív nakresli rozmazané pozadí (celý obrázek roztažený)
+    ctx.filter = 'blur(30px)'
+    ctx.drawImage(img, -20, -20, params.targetWidth + 40, params.targetHeight + 40)
+    ctx.filter = 'none'
+    
+    // Přidej tmavší overlay pro lepší kontrast
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'
+    ctx.fillRect(0, 0, params.targetWidth, params.targetHeight)
+    
+    // Pak nakresli ostrý obrázek do středu
+    let drawX = 0
+    let drawY = 0
+    let drawWidth = params.targetWidth
+    let drawHeight = params.targetHeight
+    
+    if (srcRatio > tgtRatio) {
+      drawWidth = params.targetWidth
+      drawHeight = params.targetWidth / srcRatio
+      drawY = (params.targetHeight - drawHeight) / 2
+    } else {
+      drawHeight = params.targetHeight
+      drawWidth = params.targetHeight * srcRatio
+      drawX = (params.targetWidth - drawWidth) / 2
+    }
+    
+    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
+    
+    return {
+      success: true,
+      image: canvas.toDataURL('image/png'),
+      usedFallback: true,
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message,
+    }
+  }
+}
+
+// Helper funkce
+function loadImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = dataUrl
+  })
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob)
+      else reject(new Error('Canvas to blob failed'))
+    }, type)
+  })
+}

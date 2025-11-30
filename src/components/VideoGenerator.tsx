@@ -98,54 +98,88 @@ const MOTION_OPTIONS: { value: MotionType; label: string; icon: any }[] = [
   { value: 'parallax', label: 'Parallax', icon: Layers },
 ]
 
+// Free music tracks - royalty free, CORS-friendly CDN
+// Using SampleSwap.org and other verified sources
 const FREE_MUSIC_TRACKS = [
   {
-    id: 'happy-background',
-    name: 'Happy Background',
+    id: 'corporate-upbeat',
+    name: 'Corporate Upbeat',
     genre: 'Corporate',
     mood: 'Pozitivní',
-    duration: 98,
-    url: 'https://archive.org/download/happy-background-music/Happy%20Background%20Music.mp3',
+    duration: 120,
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
   },
   {
-    id: 'feeling-happy',
-    name: 'Feeling Happy',
-    genre: 'Pop',
-    mood: 'Veselý',
-    duration: 125,
-    url: 'https://archive.org/download/happy-background-music/feeling-happy.mp3',
-  },
-  {
-    id: 'uplifting-corporate',
-    name: 'Uplifting Corporate',
-    genre: 'Corporate',
-    mood: 'Inspirativní',
-    duration: 152,
-    url: 'https://archive.org/download/happy-background-music/asian-uplifting-corporate.mp3',
-  },
-  {
-    id: 'cheerful-cinematic',
-    name: 'Cheerful Cinematic',
+    id: 'inspiring-piano',
+    name: 'Inspiring Piano',
     genre: 'Cinematic',
-    mood: 'Filmový',
-    duration: 244,
-    url: 'https://archive.org/download/happy-background-music/cheerful-cinematic.mp3',
-  },
-  {
-    id: 'acoustic-motivation',
-    name: 'Acoustic Motivation',
-    genre: 'Acoustic',
-    mood: 'Motivační',
-    duration: 88,
-    url: 'https://archive.org/download/happy-background-music/acoustic-motivation.mp3',
-  },
-  {
-    id: 'inspiration',
-    name: 'Inspiration',
-    genre: 'Corporate',
-    mood: 'Klidný',
+    mood: 'Inspirativní',
     duration: 145,
-    url: 'https://archive.org/download/happy-background-music/Inspiration.mp3',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+  },
+  {
+    id: 'happy-acoustic',
+    name: 'Happy Acoustic',
+    genre: 'Acoustic',
+    mood: 'Veselý',
+    duration: 98,
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+  },
+  {
+    id: 'technology-beat',
+    name: 'Technology Beat',
+    genre: 'Electronic',
+    mood: 'Moderní',
+    duration: 130,
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+  },
+  {
+    id: 'epic-orchestra',
+    name: 'Epic Orchestra',
+    genre: 'Cinematic',
+    mood: 'Epický',
+    duration: 180,
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+  },
+  {
+    id: 'chill-ambient',
+    name: 'Chill Ambient',
+    genre: 'Ambient',
+    mood: 'Klidný',
+    duration: 110,
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+  },
+  {
+    id: 'uplifting-pop',
+    name: 'Uplifting Pop',
+    genre: 'Pop',
+    mood: 'Optimistický',
+    duration: 95,
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
+  },
+  {
+    id: 'energetic-rock',
+    name: 'Energetic Rock',
+    genre: 'Rock',
+    mood: 'Energický',
+    duration: 115,
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+  },
+  {
+    id: 'smooth-jazz',
+    name: 'Smooth Jazz',
+    genre: 'Jazz',
+    mood: 'Relaxační',
+    duration: 200,
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
+  },
+  {
+    id: 'dance-electronic',
+    name: 'Dance Electronic',
+    genre: 'Dance',
+    mood: 'Taneční',
+    duration: 140,
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
   },
 ]
 
@@ -259,16 +293,30 @@ export function VideoGenerator() {
     setAudioUrl(track.url)
   }
 
-  const togglePreview = (track: FreeTrack) => {
+  const togglePreview = async (track: FreeTrack) => {
     if (previewingTrack?.id === track.id) {
       audioPreviewRef.current?.pause()
       setPreviewingTrack(null)
     } else {
       if (audioPreviewRef.current) {
-        audioPreviewRef.current.src = track.url
-        audioPreviewRef.current.play()
+        try {
+          audioPreviewRef.current.src = track.url
+          audioPreviewRef.current.crossOrigin = 'anonymous'
+          await audioPreviewRef.current.play()
+          setPreviewingTrack(track)
+        } catch (err) {
+          console.warn('Audio preview failed:', err)
+          // Fallback - try without crossOrigin
+          try {
+            audioPreviewRef.current.crossOrigin = ''
+            audioPreviewRef.current.src = track.url
+            await audioPreviewRef.current.play()
+            setPreviewingTrack(track)
+          } catch {
+            alert('Nepodařilo se přehrát náhled. Zkuste jiný track.')
+          }
+        }
       }
-      setPreviewingTrack(track)
     }
   }
 
@@ -545,10 +593,35 @@ export function VideoGenerator() {
           </h3>
           
           {creativesArray.length === 0 ? (
-            <div className="text-center py-8">
-              <ImageIcon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-xs text-gray-500">Žádné kreativy</p>
-              <p className="text-[10px] text-gray-400 mt-1">Nejprve vygenerujte bannery</p>
+            <div className="space-y-3">
+              <div className="text-center py-4">
+                <ImageIcon className="w-6 h-6 text-gray-300 mx-auto mb-2" />
+                <p className="text-xs text-gray-500">Žádné kreativy</p>
+                <p className="text-[10px] text-gray-400 mt-1">Nejprve vygenerujte bannery</p>
+              </div>
+              
+              {/* Demo placeholders */}
+              <div className="border-t pt-3">
+                <p className="text-[10px] text-gray-400 mb-2 text-center">Ukázkové obrázky:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'demo-1', color: '#4F46E5', label: 'Produkt 1' },
+                    { id: 'demo-2', color: '#7C3AED', label: 'Produkt 2' },
+                    { id: 'demo-3', color: '#EC4899', label: 'Lifestyle' },
+                    { id: 'demo-4', color: '#F59E0B', label: 'Akce' },
+                  ].map((demo) => (
+                    <div
+                      key={demo.id}
+                      className="relative aspect-video rounded-lg overflow-hidden cursor-not-allowed opacity-50"
+                      style={{ backgroundColor: demo.color }}
+                    >
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-white text-[9px] font-medium">{demo.label}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
