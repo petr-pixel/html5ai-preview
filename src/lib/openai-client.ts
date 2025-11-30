@@ -1,7 +1,7 @@
 /**
  * OpenAI API Client
  * Jednotné API pro všechny OpenAI služby:
- * - Images (dall-e-3)
+ * - Images (gpt-image-1 / GPT-4o image generation)
  * - Chat Completions (gpt-4o-mini, gpt-4o)
  * - Video (sora-2, sora-2-pro)
  */
@@ -18,10 +18,9 @@ export interface OpenAIConfig {
 
 export interface ImageGenerationParams {
   prompt: string
-  size: '1024x1024' | '1792x1024' | '1024x1792'
-  quality: 'standard' | 'hd'
+  size: '1024x1024' | '1536x1024' | '1024x1536' | '1792x1024' | '1024x1792' | 'auto'
+  quality: 'low' | 'medium' | 'high' | 'auto'
   n?: number
-  style?: 'vivid' | 'natural'
 }
 
 export interface ImageGenerationResult {
@@ -126,11 +125,15 @@ export async function testApiKey(apiKey: string): Promise<ApiKeyTestResult> {
 // ============================================================================
 
 export const PRICING = {
-  // Images - dall-e-3
+  // GPT-4o Image Generation (gpt-image-1)
+  // Pricing: low=$0.011, medium=$0.042, high=$0.167 per image (1024x1024)
   images: {
-    '1024x1024': { standard: 0.04, hd: 0.08 },
-    '1792x1024': { standard: 0.08, hd: 0.12 },
-    '1024x1792': { standard: 0.08, hd: 0.12 },
+    '1024x1024': { low: 0.011, medium: 0.042, high: 0.167 },
+    '1536x1024': { low: 0.016, medium: 0.063, high: 0.250 },
+    '1024x1536': { low: 0.016, medium: 0.063, high: 0.250 },
+    '1792x1024': { low: 0.016, medium: 0.063, high: 0.250 },
+    '1024x1792': { low: 0.016, medium: 0.063, high: 0.250 },
+    'auto': { low: 0.011, medium: 0.042, high: 0.167 },
   },
   // Chat Completions - per 1M tokens
   text: {
@@ -148,14 +151,14 @@ export const PRICING = {
 // HELPER: Model tier to actual model
 // ============================================================================
 
-export function getImageModel(tier: ModelTier): { quality: 'standard' | 'hd' } {
+export function getImageModel(tier: ModelTier): { quality: 'low' | 'medium' | 'high' } {
   switch (tier) {
     case 'cheap':
-      return { quality: 'standard' }
+      return { quality: 'low' }
     case 'standard':
-      return { quality: 'standard' }
+      return { quality: 'medium' }
     case 'best':
-      return { quality: 'hd' }
+      return { quality: 'high' }
   }
 }
 
@@ -182,7 +185,7 @@ export function getVideoModel(tier: ModelTier): 'sora-2' | 'sora-2-pro' {
 }
 
 // ============================================================================
-// IMAGE GENERATION
+// IMAGE GENERATION (GPT-4o / gpt-image-1)
 // ============================================================================
 
 export async function generateImage(
@@ -197,13 +200,12 @@ export async function generateImage(
         Authorization: `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify({
-        model: 'dall-e-3',
+        model: 'gpt-image-1',
         prompt: params.prompt,
         size: params.size,
         quality: params.quality,
-        n: 1, // DALL-E 3 podporuje pouze n=1
-        style: params.style || 'vivid',
-        response_format: 'b64_json',
+        n: params.n || 1,
+        output_format: 'png',
       }),
     })
 
@@ -213,11 +215,20 @@ export async function generateImage(
     }
 
     const data = await response.json()
-    const images = data.data.map((item: any) => `data:image/png;base64,${item.b64_json}`)
+    
+    // GPT-4o returns b64_json
+    const images = data.data.map((item: any) => {
+      if (item.b64_json) {
+        return `data:image/png;base64,${item.b64_json}`
+      }
+      return item.url
+    })
 
-    // Vypočítat cost
+    // Calculate cost
     const sizeKey = params.size as keyof typeof PRICING.images
-    const cost = PRICING.images[sizeKey]?.[params.quality] || 0.04
+    const qualityKey = params.quality as 'low' | 'medium' | 'high'
+    const costPerImage = PRICING.images[sizeKey]?.[qualityKey] || 0.042
+    const cost = costPerImage * (params.n || 1)
 
     return { success: true, images, cost }
   } catch (error: any) {

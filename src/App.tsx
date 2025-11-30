@@ -39,117 +39,54 @@ import {
 import type { Creative, TextOverlay, PlatformId, CategoryType } from '@/types'
 
 // ============================================================================
-// ENHANCED PROMPT BUILDER - Pro moderní 2025 AI kvalitu
+// ENHANCED PROMPT BUILDER - Pro GPT-4o image generation
 // ============================================================================
 
 function buildEnhancedPrompt(userPrompt: string, format: 'landscape' | 'square' | 'portrait'): string {
+  // GPT-4o works better with natural language prompts, less keyword stuffing
+  
   // Detekce typu obsahu z promptu
-  const isProduct = /produkt|product|zboží|goods|item/i.test(userPrompt)
-  const isLifestyle = /lifestyle|život|living|people|lidé|osoba/i.test(userPrompt)
-  const isFood = /jídlo|food|restaur|café|kafe|drink|pití/i.test(userPrompt)
-  const isTech = /tech|software|app|digital|mobil|phone|computer/i.test(userPrompt)
-  const isNature = /příroda|nature|outdoor|hory|mountain|moře|sea|les|forest/i.test(userPrompt)
+  const isProduct = /produkt|product|zboží|goods|item|věc/i.test(userPrompt)
+  const isLifestyle = /lifestyle|život|living|people|lidé|osoba|člověk/i.test(userPrompt)
+  const isFood = /jídlo|food|restaur|café|kafe|drink|pití|pizza|burger/i.test(userPrompt)
+  const isTech = /tech|software|app|digital|mobil|phone|computer|laptop/i.test(userPrompt)
+  const isNature = /příroda|nature|outdoor|hory|mountain|moře|sea|les|forest|lyž/i.test(userPrompt)
   const isFashion = /móda|fashion|oblečení|clothes|style|styl/i.test(userPrompt)
   
-  // Základní profesionální parametry
-  const baseStyle = [
-    "ultra high quality",
-    "photorealistic",
-    "8K resolution", 
-    "sharp focus",
-    "professional color grading",
-    "cinematic lighting",
-  ]
-  
   // Kompozice podle formátu
-  const compositionByFormat = {
-    landscape: "wide cinematic composition, rule of thirds, negative space on sides for text",
-    square: "balanced centered composition, symmetrical framing, clear focal point",
-    portrait: "vertical dynamic composition, subject positioned for text overlay at top or bottom",
-  }
+  const compositionHint = format === 'landscape' 
+    ? "Use wide cinematic framing with space on the sides for text overlay."
+    : format === 'portrait'
+    ? "Use vertical composition with the main subject centered, leaving space at top or bottom for text."
+    : "Use balanced square composition with the subject centered."
   
   // Styl podle typu obsahu
-  let contentStyle: string[] = []
+  let styleHint = ""
   
-  if (isProduct) {
-    contentStyle = [
-      "commercial product photography",
-      "studio lighting setup",
-      "clean gradient background",
-      "subtle reflections",
-      "hero shot angle",
-    ]
+  if (isNature || userPrompt.toLowerCase().includes('lyž')) {
+    styleHint = "Capture the scene like a professional outdoor/adventure photographer. Natural lighting, vivid colors, dynamic composition that conveys energy and excitement."
+  } else if (isProduct) {
+    styleHint = "Professional product photography with clean background, perfect studio lighting, and hero angle that showcases the product beautifully."
   } else if (isFood) {
-    contentStyle = [
-      "professional food photography",
-      "appetizing presentation",
-      "natural daylight feel",
-      "shallow depth of field",
-      "fresh ingredients visible",
-    ]
+    styleHint = "Appetizing food photography with natural lighting, shallow depth of field, and fresh vibrant colors that make the food look delicious."
   } else if (isTech) {
-    contentStyle = [
-      "modern tech aesthetic",
-      "clean minimal design",
-      "cool blue and white tones",
-      "sleek surfaces",
-      "futuristic atmosphere",
-    ]
+    styleHint = "Modern tech aesthetic with clean lines, cool tones, and sleek minimalist presentation."
   } else if (isFashion) {
-    contentStyle = [
-      "high-end fashion photography",
-      "editorial style",
-      "dramatic lighting",
-      "sophisticated color palette",
-      "aspirational mood",
-    ]
-  } else if (isNature) {
-    contentStyle = [
-      "landscape photography",
-      "golden hour lighting",
-      "vivid natural colors",
-      "breathtaking scenery",
-      "sense of adventure",
-    ]
+    styleHint = "High-end fashion editorial style with dramatic lighting and sophisticated color palette."
   } else if (isLifestyle) {
-    contentStyle = [
-      "authentic lifestyle photography",
-      "natural candid moment",
-      "warm inviting atmosphere",
-      "genuine emotion",
-      "relatable scene",
-    ]
+    styleHint = "Authentic lifestyle photography capturing a genuine moment with warm, inviting atmosphere."
   } else {
-    // Default professional style
-    contentStyle = [
-      "premium advertising photography",
-      "modern aesthetic",
-      "sophisticated lighting",
-      "professional art direction",
-      "brand-quality imagery",
-    ]
+    styleHint = "Professional advertising photography with perfect lighting, compelling composition, and premium quality suitable for a major brand campaign."
   }
   
-  // Anti-AI artifacts
-  const antiArtifacts = [
-    "no watermarks",
-    "no text in image",
-    "no logos",
-    "anatomically correct",
-    "natural proportions",
-  ]
-  
-  // Sestavení finálního promptu
-  const promptParts = [
-    userPrompt,
-    ...baseStyle,
-    compositionByFormat[format],
-    ...contentStyle,
-    ...antiArtifacts,
-    "trending on Behance and Dribbble 2025",
-  ]
-  
-  return promptParts.join(", ")
+  // Sestavení promptu pro GPT-4o - přirozený jazyk
+  return `${userPrompt}
+
+${styleHint}
+
+${compositionHint}
+
+Technical requirements: Photorealistic, sharp focus, professional color grading. No text, watermarks, or logos in the image. The image should look like it was shot by a top advertising photographer.`
 }
 
 // ============================================================================
@@ -234,15 +171,15 @@ export default function App() {
     setProgress(10)
 
     try {
-      // DALL-E 3 supported sizes: 1024x1024, 1792x1024 (landscape), 1024x1792 (portrait)
-      const size = sourceFormat === 'landscape' ? '1792x1024' 
-                 : sourceFormat === 'portrait' ? '1024x1792' 
+      // GPT-4o image generation - supported sizes
+      const size = sourceFormat === 'landscape' ? '1536x1024' 
+                 : sourceFormat === 'portrait' ? '1024x1536' 
                  : '1024x1024'
 
-      const quality = imageModelTier === 'best' ? 'hd' : 'standard'
-
-      // Build professional prompt for modern AI imagery
+      // Build professional prompt
       const enhancedPrompt = buildEnhancedPrompt(prompt, sourceFormat)
+      
+      console.log('Generating with GPT-4o:', { size, quality: imageModelTier, prompt: enhancedPrompt })
 
       const res = await fetch('https://api.openai.com/v1/images/generations', {
         method: 'POST',
@@ -251,18 +188,25 @@ export default function App() {
           Authorization: `Bearer ${apiKeys.openai}`,
         },
         body: JSON.stringify({
-          model: 'dall-e-3',
+          model: 'gpt-image-1',
           prompt: enhancedPrompt,
           size: size,
-          quality: quality,
+          quality: imageModelTier === 'best' ? 'high' : imageModelTier === 'cheap' ? 'low' : 'medium',
           n: 1,
-          response_format: 'b64_json',
         }),
       })
 
       setProgress(60)
+      
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error?.message || `API error: ${res.status}`)
+      }
+      
       const data = await res.json()
+      console.log('GPT-4o response:', data)
 
+      // GPT-4o returns b64_json in data[0].b64_json
       const b64 = data?.data?.[0]?.b64_json
       if (b64) {
         setSourceImage(`data:image/png;base64,${b64}`)
@@ -270,10 +214,18 @@ export default function App() {
         return
       }
 
-      throw new Error('No image')
-    } catch (err) {
-      console.error(err)
-      createDemoImage()
+      // Check for URL response
+      const url = data?.data?.[0]?.url
+      if (url) {
+        setSourceImage(url)
+        setProgress(100)
+        return
+      }
+
+      throw new Error('No image in response')
+    } catch (err: any) {
+      console.error('Image generation error:', err)
+      alert(`Chyba generování: ${err.message}`)
     } finally {
       setIsGenerating(false)
     }
@@ -953,69 +905,128 @@ function drawTextOverlay(
   height: number,
   brandKit?: { ctaColor?: string; headlineFont?: string; textColor?: string }
 ) {
-  if (!overlay.headline && !overlay.subheadline && !overlay.cta) return
+  if (!overlay.headline && !overlay.subheadline && !overlay.cta) {
+    return
+  }
 
-  const padding = Math.min(width, height) * 0.05
+  // Detect banner aspect ratio for smart sizing
+  const aspectRatio = width / height
+  const isWide = aspectRatio > 2.5  // Leaderboard, Billboard (970x90, 970x250)
+  const isTall = aspectRatio < 0.5  // Skyscraper, Half Page (160x600, 300x600)
+  const isSquarish = aspectRatio >= 0.5 && aspectRatio <= 2.5
+
+  const padding = Math.min(width, height) * 0.06
   const fontFamily = brandKit?.headlineFont || 'Arial, Helvetica, sans-serif'
   const textColor = brandKit?.textColor || '#ffffff'
-  const ctaColor = overlay.ctaColor || brandKit?.ctaColor || '#1a73e8'
+  const ctaColor = overlay.ctaColor || brandKit?.ctaColor || '#ff6600'
 
-  // Font sizes based on overlay.fontSize
-  const baseSize = Math.min(width, height)
-  const sizes = {
-    small: { headline: baseSize * 0.06, sub: baseSize * 0.04, cta: baseSize * 0.035 },
-    medium: { headline: baseSize * 0.08, sub: baseSize * 0.05, cta: baseSize * 0.04 },
-    large: { headline: baseSize * 0.1, sub: baseSize * 0.06, cta: baseSize * 0.05 },
+  // Smart font sizing based on banner dimensions
+  // For wide banners: use height as base but ensure readability
+  // For tall banners: use width as base
+  // For square-ish: use smaller dimension
+  let baseSize: number
+  if (isWide) {
+    baseSize = height * 0.9  // Wide banners - use most of height
+  } else if (isTall) {
+    baseSize = width * 0.8   // Tall banners - use most of width
+  } else {
+    baseSize = Math.min(width, height)
   }
-  const size = sizes[overlay.fontSize] || sizes.medium
+
+  // Font size multipliers based on overlay.fontSize setting
+  const sizeMultipliers = {
+    small: { headline: 0.18, sub: 0.12, cta: 0.10 },
+    medium: { headline: 0.24, sub: 0.15, cta: 0.12 },
+    large: { headline: 0.32, sub: 0.18, cta: 0.14 },
+  }
+  const multiplier = sizeMultipliers[overlay.fontSize] || sizeMultipliers.medium
+  
+  // Calculate actual font sizes with min/max bounds
+  const size = {
+    headline: Math.max(12, Math.min(baseSize * multiplier.headline, 72)),
+    sub: Math.max(10, Math.min(baseSize * multiplier.sub, 48)),
+    cta: Math.max(9, Math.min(baseSize * multiplier.cta, 36)),
+  }
 
   // Calculate total text block height
   let blockHeight = 0
   if (overlay.headline) blockHeight += size.headline * 1.3
-  if (overlay.subheadline) blockHeight += size.sub * 1.5
-  if (overlay.cta) blockHeight += size.cta * 2.5
+  if (overlay.subheadline) blockHeight += size.sub * 1.4
+  if (overlay.cta) blockHeight += size.cta * 2.8
+
+  // For wide banners, stack horizontally if needed
+  const useHorizontalLayout = isWide && blockHeight > height * 0.8
 
   // Calculate starting position
+  const position = overlay.position || 'bottom-left'
   let x = padding
   let y = padding
   let align: CanvasTextAlign = 'left'
 
-  switch (overlay.position) {
-    case 'top-left':
-      x = padding
-      y = padding
-      align = 'left'
-      break
-    case 'top-center':
-      x = width / 2
-      y = padding
-      align = 'center'
-      break
-    case 'top-right':
-      x = width - padding
-      y = padding
-      align = 'right'
-      break
-    case 'center':
-      x = width / 2
-      y = (height - blockHeight) / 2
-      align = 'center'
-      break
-    case 'bottom-left':
-      x = padding
-      y = height - padding - blockHeight
-      align = 'left'
-      break
-    case 'bottom-center':
-      x = width / 2
-      y = height - padding - blockHeight
-      align = 'center'
-      break
-    case 'bottom-right':
-      x = width - padding
-      y = height - padding - blockHeight
-      align = 'right'
-      break
+  if (useHorizontalLayout) {
+    // Wide banner: center everything vertically
+    y = (height - size.headline) / 2
+    switch (position) {
+      case 'top-left':
+      case 'bottom-left':
+        x = padding
+        align = 'left'
+        break
+      case 'top-center':
+      case 'center':
+      case 'bottom-center':
+        x = width / 2
+        align = 'center'
+        break
+      case 'top-right':
+      case 'bottom-right':
+        x = width - padding
+        align = 'right'
+        break
+    }
+  } else {
+    // Normal vertical stacking
+    switch (position) {
+      case 'top-left':
+        x = padding
+        y = padding
+        align = 'left'
+        break
+      case 'top-center':
+        x = width / 2
+        y = padding
+        align = 'center'
+        break
+      case 'top-right':
+        x = width - padding
+        y = padding
+        align = 'right'
+        break
+      case 'center':
+        x = width / 2
+        y = (height - blockHeight) / 2
+        align = 'center'
+        break
+      case 'bottom-left':
+        x = padding
+        y = height - padding - blockHeight
+        align = 'left'
+        break
+      case 'bottom-center':
+        x = width / 2
+        y = height - padding - blockHeight
+        align = 'center'
+        break
+      case 'bottom-right':
+        x = width - padding
+        y = height - padding - blockHeight
+        align = 'right'
+        break
+      default:
+        x = width / 2
+        y = (height - blockHeight) / 2
+        align = 'center'
+    }
   }
 
   ctx.textAlign = align
@@ -1027,25 +1038,25 @@ function drawTextOverlay(
     ctx.fillStyle = textColor
     
     // Text shadow for readability
-    ctx.shadowColor = 'rgba(0,0,0,0.7)'
-    ctx.shadowBlur = 6
-    ctx.shadowOffsetX = 2
-    ctx.shadowOffsetY = 2
+    ctx.shadowColor = 'rgba(0,0,0,0.8)'
+    ctx.shadowBlur = Math.max(2, size.headline * 0.1)
+    ctx.shadowOffsetX = 1
+    ctx.shadowOffsetY = 1
     
     ctx.textBaseline = 'top'
     ctx.fillText(overlay.headline, x, currentY)
     currentY += size.headline * 1.3
   }
 
-  // Draw subheadline
-  if (overlay.subheadline) {
+  // Draw subheadline (skip for very wide banners to save space)
+  if (overlay.subheadline && !useHorizontalLayout) {
     ctx.font = `${Math.round(size.sub)}px ${fontFamily}`
     ctx.fillStyle = textColor
-    ctx.shadowColor = 'rgba(0,0,0,0.5)'
-    ctx.shadowBlur = 4
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'
+    ctx.shadowBlur = Math.max(1, size.sub * 0.08)
     ctx.textBaseline = 'top'
     ctx.fillText(overlay.subheadline, x, currentY)
-    currentY += size.sub * 1.5
+    currentY += size.sub * 1.4
   }
 
   // Reset shadow before CTA
@@ -1054,16 +1065,15 @@ function drawTextOverlay(
   ctx.shadowOffsetX = 0
   ctx.shadowOffsetY = 0
 
-  // Draw CTA Button
-  if (overlay.cta) {
-    // Measure CTA text
+  // Draw CTA Button (skip for very small banners)
+  if (overlay.cta && size.cta >= 9) {
     ctx.font = `bold ${Math.round(size.cta)}px ${fontFamily}`
     const ctaTextWidth = ctx.measureText(overlay.cta).width
-    const ctaPaddingX = size.cta * 1.2
-    const ctaPaddingY = size.cta * 0.6
+    const ctaPaddingX = size.cta * 0.8
+    const ctaPaddingY = size.cta * 0.4
     const ctaWidth = ctaTextWidth + ctaPaddingX * 2
     const ctaHeight = size.cta + ctaPaddingY * 2
-    const ctaRadius = ctaHeight / 2
+    const ctaRadius = Math.min(ctaHeight / 2, 8)
 
     // Calculate CTA X position based on alignment
     let ctaX = x

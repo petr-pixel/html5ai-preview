@@ -23,21 +23,23 @@ export function SourceVariantsPanel() {
   const [progress, setProgress] = useState(0)
   const [variantCount, setVariantCount] = useState(3)
 
-  // Velikost podle formátu - DALL-E 3 podporuje pouze tyto
-  const getSize = (): '1024x1024' | '1792x1024' | '1024x1792' => {
+  // Velikost podle formátu - GPT-4o podporuje více velikostí
+  const getSize = (): '1024x1024' | '1536x1024' | '1024x1536' => {
     switch (sourceFormat) {
       case 'landscape':
-        return '1792x1024'
+        return '1536x1024'
       case 'portrait':
-        return '1024x1792'
+        return '1024x1536'
       default:
         return '1024x1024'
     }
   }
 
-  // Odhad ceny
+  // Odhad ceny - GPT-4o pricing
   const { quality } = getImageModel(imageModelTier)
-  const costPerImage = PRICING.images[getSize()][quality]
+  const sizeKey = getSize()
+  const pricingForSize = PRICING.images[sizeKey] as { low: number; medium: number; high: number }
+  const costPerImage = pricingForSize[quality]
   const totalCost = costPerImage * variantCount
 
   // Generovat varianty
