@@ -26,6 +26,7 @@ import { QuickMode } from '@/components/QuickMode'
 import { SafeZoneOverlay } from '@/components/SafeZoneOverlay'
 import { ImagePositionControl } from '@/components/ImagePositionControl'
 import { PerFormatTextEditor } from '@/components/PerFormatTextEditor'
+import { FormatEditor } from '@/components/FormatEditor'
 import { downloadBlob, createCreativePackZip } from '@/lib/export'
 import { calculateSmartCrop } from '@/lib/smart-crop'
 import { Button, Progress, Spinner } from '@/components/ui'
@@ -103,6 +104,7 @@ export default function App() {
   // Navigation state
   const [currentView, setCurrentView] = useState<NavigationView>('editor')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [editingFormat, setEditingFormat] = useState<{ key: string; format: any } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Store
@@ -1191,27 +1193,37 @@ export default function App() {
                 const isSelected = selectedFormats.has(formatKey)
                 const creative = creatives[formatKey]
                 const hasSafeZone = format.safeZone !== undefined
+                const hasCustomSettings = perFormatTextSettings[formatKey] && (
+                  perFormatTextSettings[formatKey].fontSizeMultiplier !== 1.0 ||
+                  perFormatTextSettings[formatKey].hideHeadline ||
+                  perFormatTextSettings[formatKey].hideSubheadline ||
+                  perFormatTextSettings[formatKey].hideCta ||
+                  perFormatTextSettings[formatKey].customPosition
+                )
 
                 return (
                   <div
                     key={formatKey}
-                    onClick={() => toggleFormat(formatKey)}
                     className={cn(
                       'format-card',
                       isSelected && 'format-card-selected'
                     )}
                   >
-                    {/* Checkbox */}
-                    <div className={cn(
-                      'format-card-checkbox',
-                      isSelected && 'format-card-checkbox-checked'
-                    )}>
+                    {/* Checkbox - kliknutí zde toggle selection */}
+                    <div 
+                      onClick={(e) => { e.stopPropagation(); toggleFormat(formatKey) }}
+                      className={cn(
+                        'format-card-checkbox cursor-pointer',
+                        isSelected && 'format-card-checkbox-checked'
+                      )}
+                    >
                       {isSelected && <Check className="w-3 h-3" />}
                     </div>
 
-                    {/* Preview */}
+                    {/* Preview - kliknutí otevře editor */}
                     <div 
-                      className="relative bg-gray-100 rounded mb-2 overflow-hidden"
+                      onClick={() => setEditingFormat({ key: formatKey, format })}
+                      className="relative bg-gray-100 rounded mb-2 overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
                       style={{ 
                         paddingBottom: `${(format.height / format.width) * 100}%`,
                         maxHeight: '120px'
@@ -1242,6 +1254,18 @@ export default function App() {
                           width={format.width}
                           height={format.height}
                         />
+                      )}
+
+                      {/* Edit hint on hover */}
+                      <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+                        <span className="text-white text-xs font-medium bg-black/50 px-2 py-1 rounded">
+                          Upravit
+                        </span>
+                      </div>
+
+                      {/* Custom settings badge */}
+                      {hasCustomSettings && (
+                        <div className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" title="Vlastní nastavení" />
                       )}
                     </div>
 
@@ -1330,6 +1354,16 @@ export default function App() {
       </main>
 
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+
+      {/* Format Editor Modal */}
+      {editingFormat && (
+        <FormatEditor
+          formatKey={editingFormat.key}
+          format={editingFormat.format}
+          sourceImage={sourceImage}
+          onClose={() => setEditingFormat(null)}
+        />
+      )}
     </div>
   )
 }

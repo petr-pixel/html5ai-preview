@@ -217,8 +217,25 @@ export function VideoGenerator() {
   // Slideshow state
   const [slides, setSlides] = useState<SlideItem[]>([])
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [audioFile, setAudioFile] = useState<File | null>(null)
   const [selectedFreeTrack, setSelectedFreeTrack] = useState<FreeTrack | null>(null)
   const [previewingTrack, setPreviewingTrack] = useState<FreeTrack | null>(null)
+  
+  // Text overlay state
+  const [videoText, setVideoText] = useState({
+    enabled: false,
+    headline: '',
+    subheadline: '',
+    cta: '',
+    position: 'bottom' as 'top' | 'center' | 'bottom',
+    animation: 'fade' as 'none' | 'fade' | 'slide-up' | 'typewriter',
+    showOnAllSlides: true,
+    ctaColor: '#ff6600',
+  })
+  
+  // Transition state
+  const [transitionType, setTransitionType] = useState<'fade' | 'slide' | 'zoom' | 'none'>('fade')
+  const [transitionDuration, setTransitionDuration] = useState(500) // ms
   
   // Motion AI state
   const [motionSelectedImage, setMotionSelectedImage] = useState<Creative | null>(null)
@@ -455,18 +472,21 @@ export function VideoGenerator() {
 
     try {
       if (selectedTier === 'slideshow') {
-        setProgressMessage('Generuji slideshow video...')
+        setProgressMessage('Připravuji video...')
         
-        const videoResult = await createSlideshowFromCreatives(
-          slides.map(s => s.creative),
-          {
-            aspectRatio: videoScenario.aspectRatio as '16:9' | '9:16' | '1:1',
-            secondsPerSlide: slides[0]?.duration || 3,
-            transition: 'fade',
-            audioUrl: audioUrl || undefined,
-          },
-          (p) => setProgress(p)
-        )
+        // Použijeme vlastní Canvas-based generátor
+        const videoBlob = await generateSlideshowVideo()
+        
+        const videoUrl = URL.createObjectURL(videoBlob)
+        
+        const videoResult: VideoResult = {
+          videoUrl,
+          thumbnailUrl: slides[0]?.creative.imageUrl,
+          duration: totalDuration,
+          tier: 'slideshow',
+          format: 'webm',
+          cost: 0,
+        }
         
         setResult(videoResult)
         
@@ -488,10 +508,12 @@ export function VideoGenerator() {
           videoDuration: totalDuration,
           isVideo: true,
           createdAt: new Date(),
-          sizeKB: Math.round(videoResult.videoUrl.length * 3 / 4 / 1024),
+          sizeKB: Math.round(videoBlob.size / 1024),
         }
         
         addCreatives([videoCreative])
+        setProgress(100)
+        setProgressMessage('Video připraveno!')
         
       } else if (selectedTier === 'motion') {
         setProgressMessage('Motion AI zatím není dostupné...')
@@ -513,8 +535,376 @@ export function VideoGenerator() {
       setError(err instanceof Error ? err.message : 'Nastala chyba při generování videa')
     } finally {
       setIsGenerating(false)
-      setProgressMessage('')
     }
+  }
+
+  // Vlastní slideshow generátor pomocí Canvas + MediaRecorder
+  const generateSlideshowVideo = async (): Promise<Blob> => {
+    const [width, height] = videoScenario.aspectRatio === '16:9' 
+      ? [1280, 720]  // Menší rozlišení pro rychlejší generování
+      : videoScenario.aspectRatio === '9:16'
+        ? [720, 1280]
+        : [720, 720]
+    
+    const fps = 30
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')!
+    
+    // Načti všechny obrázky
+    setProgressMessage('Načítám obrázky...')
+    setProgress(10)
+    
+    const images: HTMLImageElement[] = []
+    for (const slide of slides) {
+      const img = await loadImageAsync(slide.creative.imageUrl)
+      images.push(img)
+    }
+    
+    setProgressMessage('Generuji video...')
+    setProgress(20)
+    
+    // Nastavení MediaRecorder
+    const stream = canvas.captureStream(fps)
+    
+    // Přidej audio track pokud existuje
+    let audioContext: AudioContext | null = null
+    let audioSource: MediaElementAudioSourceNode | null = null
+    let audioDestination: MediaStreamAudioDestinationNode | null = null
+    let audioElement: HTMLAudioElement | null = null
+    
+    if (audioUrl) {
+      try {
+        audioContext = new AudioContext()
+        audioDestination = audioContext.createMediaStreamDestination()
+        audioElement = new Audio(audioUrl)
+        audioElement.crossOrigin = 'anonymous'
+        
+        // Počkáme na načtení audia
+        await new Promise<void>((resolve, reject) => {
+          audioElement!.oncanplaythrough = () => resolve()
+          audioElement!.onerror = () => reject(new Error('Nepodařilo se načíst audio'))
+          audioElement!.load()
+        })
+        
+        audioSource = audioContext.createMediaElementSource(audioElement)
+        audioSource.connect(audioDestination)
+        audioSource.connect(audioContext.destination) // Pro přehrávání během nahrávání
+        
+        // Přidej audio track do streamu
+        const audioTrack = audioDestination.stream.getAudioTracks()[0]
+        if (audioTrack) {
+          stream.addTrack(audioTrack)
+        }
+      } catch (e) {
+        console.warn('Audio se nepodařilo připojit:', e)
+      }
+    }
+    
+    // Najdi podporovaný mimeType
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') 
+      ? 'video/webm;codecs=vp9'
+      : MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+        ? 'video/webm;codecs=vp8'
+        : 'video/webm'
+    
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType,
+      videoBitsPerSecond: 2500000,
+    })
+    
+    const chunks: Blob[] = []
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data)
+    }
+    
+    return new Promise((resolve, reject) => {
+      mediaRecorder.onstop = () => {
+        // Cleanup audio
+        if (audioElement) {
+          audioElement.pause()
+          audioElement.src = ''
+        }
+        if (audioContext) {
+          audioContext.close()
+        }
+        resolve(new Blob(chunks, { type: mimeType }))
+      }
+      mediaRecorder.onerror = (e) => reject(e)
+      
+      mediaRecorder.start(100) // Chunk every 100ms
+      
+      // Spusť audio
+      if (audioElement) {
+        audioElement.currentTime = 0
+        audioElement.play().catch(console.warn)
+      }
+      
+      const totalMs = totalDuration * 1000
+      const transitionMs = transitionDuration
+      let currentTime = 0
+      let lastFrameTime = performance.now()
+      
+      const renderFrame = () => {
+        const now = performance.now()
+        const deltaTime = now - lastFrameTime
+        lastFrameTime = now
+        currentTime += deltaTime
+        
+        if (currentTime >= totalMs) {
+          mediaRecorder.stop()
+          return
+        }
+        
+        // Najdi aktuální slide
+        let accTime = 0
+        let slideIndex = 0
+        let slideTime = 0
+        
+        for (let i = 0; i < slides.length; i++) {
+          const slideMs = slides[i].duration * 1000
+          if (currentTime < accTime + slideMs) {
+            slideIndex = i
+            slideTime = currentTime - accTime
+            break
+          }
+          accTime += slideMs
+          slideIndex = i
+          slideTime = slides[i].duration * 1000
+        }
+        
+        const slide = slides[slideIndex]
+        const img = images[slideIndex]
+        const nextImg = images[slideIndex + 1]
+        const slideMs = slide.duration * 1000
+        const slideProgress = slideTime / slideMs
+        
+        // Clear canvas
+        ctx.fillStyle = '#000'
+        ctx.fillRect(0, 0, width, height)
+        
+        // Je transition?
+        const isInTransition = slideTime > (slideMs - transitionMs) && nextImg && transitionType !== 'none'
+        const transitionProgress = isInTransition 
+          ? (slideTime - (slideMs - transitionMs)) / transitionMs 
+          : 0
+        
+        if (isInTransition && nextImg) {
+          // Draw transition
+          switch (transitionType) {
+            case 'fade':
+              drawImageCover(ctx, img, width, height, slide.motion, slide.motionIntensity, 1)
+              ctx.globalAlpha = transitionProgress
+              drawImageCover(ctx, nextImg, width, height, slides[slideIndex + 1]?.motion || 'none', 0, 0)
+              ctx.globalAlpha = 1
+              break
+            case 'slide':
+              ctx.save()
+              ctx.translate(-width * transitionProgress, 0)
+              drawImageCover(ctx, img, width, height, slide.motion, slide.motionIntensity, 1)
+              ctx.translate(width, 0)
+              drawImageCover(ctx, nextImg, width, height, 'none', 0, 0)
+              ctx.restore()
+              break
+            case 'zoom':
+              const scale = 1 + transitionProgress * 0.3
+              ctx.save()
+              ctx.translate(width / 2, height / 2)
+              ctx.scale(scale, scale)
+              ctx.globalAlpha = 1 - transitionProgress
+              ctx.translate(-width / 2, -height / 2)
+              drawImageCover(ctx, img, width, height, 'none', 0, 0)
+              ctx.restore()
+              ctx.globalAlpha = transitionProgress
+              drawImageCover(ctx, nextImg, width, height, 'none', 0, 0)
+              ctx.globalAlpha = 1
+              break
+            default:
+              drawImageCover(ctx, img, width, height, slide.motion, slide.motionIntensity, slideProgress)
+          }
+        } else {
+          // Draw slide with motion
+          drawImageCover(ctx, img, width, height, slide.motion, slide.motionIntensity, slideProgress)
+        }
+        
+        // Draw text overlay
+        if (videoText.enabled && (videoText.headline || videoText.cta)) {
+          drawVideoText(ctx, width, height, slideProgress)
+        }
+        
+        // Update progress
+        setProgress(20 + (currentTime / totalMs) * 75)
+        
+        requestAnimationFrame(renderFrame)
+      }
+      
+      renderFrame()
+    })
+  }
+  
+  // Helper: Načti obrázek
+  const loadImageAsync = (url: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => resolve(img)
+      img.onerror = reject
+      img.src = url
+    })
+  }
+  
+  // Helper: Vykresli obrázek cover s motion efektem
+  const drawImageCover = (
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    width: number,
+    height: number,
+    motion: MotionType,
+    intensity: number,
+    progress: number
+  ) => {
+    const imgRatio = img.width / img.height
+    const canvasRatio = width / height
+    
+    let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number
+    
+    if (imgRatio > canvasRatio) {
+      drawHeight = height
+      drawWidth = height * imgRatio
+      offsetX = (width - drawWidth) / 2
+      offsetY = 0
+    } else {
+      drawWidth = width
+      drawHeight = width / imgRatio
+      offsetX = 0
+      offsetY = (height - drawHeight) / 2
+    }
+    
+    // Apply motion
+    const motionScale = 1 + (intensity / 100) * 0.2
+    
+    ctx.save()
+    
+    switch (motion) {
+      case 'ken-burns-in':
+        const scaleIn = 1 + progress * (motionScale - 1)
+        ctx.translate(width / 2, height / 2)
+        ctx.scale(scaleIn, scaleIn)
+        ctx.translate(-width / 2, -height / 2)
+        break
+      case 'ken-burns-out':
+        const scaleOut = motionScale - progress * (motionScale - 1)
+        ctx.translate(width / 2, height / 2)
+        ctx.scale(scaleOut, scaleOut)
+        ctx.translate(-width / 2, -height / 2)
+        break
+      case 'pan-left':
+        const panL = progress * (intensity / 100) * drawWidth * 0.2
+        offsetX -= panL
+        break
+      case 'pan-right':
+        const panR = progress * (intensity / 100) * drawWidth * 0.2
+        offsetX += panR
+        break
+      case 'parallax':
+        const parallax = Math.sin(progress * Math.PI) * (intensity / 100) * 30
+        offsetY += parallax
+        break
+    }
+    
+    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight)
+    ctx.restore()
+  }
+  
+  // Helper: Vykresli text overlay
+  const drawVideoText = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    progress: number
+  ) => {
+    const padding = 40
+    const fontFamily = 'Arial, Helvetica, sans-serif'
+    
+    // Animation
+    let alpha = 1
+    let offsetY = 0
+    
+    if (videoText.animation === 'fade') {
+      // Fade in first 10%, fade out last 10%
+      if (progress < 0.1) alpha = progress / 0.1
+      else if (progress > 0.9) alpha = (1 - progress) / 0.1
+    } else if (videoText.animation === 'slide-up') {
+      if (progress < 0.15) {
+        offsetY = (1 - progress / 0.15) * 50
+        alpha = progress / 0.15
+      } else if (progress > 0.85) {
+        alpha = (1 - progress) / 0.15
+      }
+    }
+    
+    ctx.save()
+    ctx.globalAlpha = alpha
+    
+    // Calculate position
+    let textY: number
+    switch (videoText.position) {
+      case 'top':
+        textY = padding + 60
+        break
+      case 'center':
+        textY = height / 2
+        break
+      default:
+        textY = height - padding - 80
+    }
+    textY += offsetY
+    
+    // Draw semi-transparent background
+    const bgHeight = 120
+    const bgY = textY - 40
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+    ctx.fillRect(0, bgY, width, bgHeight)
+    
+    // Draw headline
+    if (videoText.headline) {
+      ctx.font = `bold ${Math.min(48, width * 0.05)}px ${fontFamily}`
+      ctx.fillStyle = '#ffffff'
+      ctx.textAlign = 'center'
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'
+      ctx.shadowBlur = 4
+      ctx.fillText(videoText.headline, width / 2, textY)
+    }
+    
+    // Draw subheadline
+    if (videoText.subheadline) {
+      ctx.font = `${Math.min(28, width * 0.03)}px ${fontFamily}`
+      ctx.fillText(videoText.subheadline, width / 2, textY + 35)
+    }
+    
+    // Draw CTA
+    if (videoText.cta) {
+      const ctaY = textY + (videoText.subheadline ? 70 : 45)
+      const ctaFont = Math.min(24, width * 0.025)
+      ctx.font = `bold ${ctaFont}px ${fontFamily}`
+      const ctaWidth = ctx.measureText(videoText.cta).width + 40
+      const ctaHeight = ctaFont + 20
+      const ctaX = (width - ctaWidth) / 2
+      
+      // Button background
+      ctx.shadowBlur = 0
+      ctx.fillStyle = videoText.ctaColor
+      ctx.beginPath()
+      ctx.roundRect(ctaX, ctaY - ctaHeight + 5, ctaWidth, ctaHeight, ctaHeight / 2)
+      ctx.fill()
+      
+      // Button text
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(videoText.cta, width / 2, ctaY)
+    }
+    
+    ctx.restore()
   }
 
   // ============================================================================
@@ -858,6 +1248,147 @@ export function VideoGenerator() {
                   onChange={handleAudioUpload}
                 />
                 <audio ref={audioPreviewRef} className="hidden" />
+              </div>
+
+              {/* Text Overlay */}
+              <div className="pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                    <Type className="w-4 h-4" />
+                    Text na videu
+                  </h3>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={videoText.enabled}
+                      onChange={(e) => setVideoText({ ...videoText, enabled: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    />
+                    <span className="text-xs text-gray-600">Zapnout</span>
+                  </label>
+                </div>
+
+                {videoText.enabled && (
+                  <div className="space-y-3 animate-fade-in">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Headline</label>
+                      <input
+                        type="text"
+                        value={videoText.headline}
+                        onChange={(e) => setVideoText({ ...videoText, headline: e.target.value })}
+                        placeholder="Hlavní text videa"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Subheadline (volitelné)</label>
+                      <input
+                        type="text"
+                        value={videoText.subheadline}
+                        onChange={(e) => setVideoText({ ...videoText, subheadline: e.target.value })}
+                        placeholder="Doplňující text"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">CTA tlačítko</label>
+                        <input
+                          type="text"
+                          value={videoText.cta}
+                          onChange={(e) => setVideoText({ ...videoText, cta: e.target.value })}
+                          placeholder="Zjistit více"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Barva CTA</label>
+                        <input
+                          type="color"
+                          value={videoText.ctaColor}
+                          onChange={(e) => setVideoText({ ...videoText, ctaColor: e.target.value })}
+                          className="w-full h-9 rounded-lg cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Pozice textu</label>
+                        <select
+                          value={videoText.position}
+                          onChange={(e) => setVideoText({ ...videoText, position: e.target.value as any })}
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        >
+                          <option value="top">Nahoře</option>
+                          <option value="center">Uprostřed</option>
+                          <option value="bottom">Dole</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Animace</label>
+                        <select
+                          value={videoText.animation}
+                          onChange={(e) => setVideoText({ ...videoText, animation: e.target.value as any })}
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        >
+                          <option value="none">Žádná</option>
+                          <option value="fade">Fade In/Out</option>
+                          <option value="slide-up">Slide Up</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Transitions */}
+              <div className="pt-4 border-t border-gray-200">
+                <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  <Layers className="w-4 h-4" />
+                  Přechody mezi snímky
+                </h3>
+                
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {[
+                    { value: 'fade', label: 'Fade' },
+                    { value: 'slide', label: 'Slide' },
+                    { value: 'zoom', label: 'Zoom' },
+                    { value: 'none', label: 'Žádný' },
+                  ].map((t) => (
+                    <button
+                      key={t.value}
+                      onClick={() => setTransitionType(t.value as any)}
+                      className={cn(
+                        'px-3 py-2 rounded-lg text-xs font-medium transition-all',
+                        transitionType === t.value
+                          ? 'bg-purple-100 text-purple-700 border-2 border-purple-500'
+                          : 'bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200'
+                      )}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                
+                {transitionType !== 'none' && (
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">
+                      Délka přechodu: {transitionDuration}ms
+                    </label>
+                    <input
+                      type="range"
+                      min="200"
+                      max="1500"
+                      step="100"
+                      value={transitionDuration}
+                      onChange={(e) => setTransitionDuration(parseInt(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}
