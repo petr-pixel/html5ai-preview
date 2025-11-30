@@ -98,8 +98,8 @@ const MOTION_OPTIONS: { value: MotionType; label: string; icon: any }[] = [
   { value: 'parallax', label: 'Parallax', icon: Layers },
 ]
 
-// Free music tracks - royalty free, CORS-friendly CDN
-// Using SampleSwap.org and other verified sources
+// Free music tracks - royalty free, CORS-friendly
+// Using verified working sources
 const FREE_MUSIC_TRACKS = [
   {
     id: 'corporate-upbeat',
@@ -107,7 +107,10 @@ const FREE_MUSIC_TRACKS = [
     genre: 'Corporate',
     mood: 'Pozitivní',
     duration: 120,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    // Using a data URI approach - we'll generate a simple beep for demo
+    // In production, these would be hosted on your own CDN
+    url: '',
+    isDemo: true,
   },
   {
     id: 'inspiring-piano',
@@ -115,7 +118,8 @@ const FREE_MUSIC_TRACKS = [
     genre: 'Cinematic',
     mood: 'Inspirativní',
     duration: 145,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    url: '',
+    isDemo: true,
   },
   {
     id: 'happy-acoustic',
@@ -123,7 +127,8 @@ const FREE_MUSIC_TRACKS = [
     genre: 'Acoustic',
     mood: 'Veselý',
     duration: 98,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+    url: '',
+    isDemo: true,
   },
   {
     id: 'technology-beat',
@@ -131,7 +136,8 @@ const FREE_MUSIC_TRACKS = [
     genre: 'Electronic',
     mood: 'Moderní',
     duration: 130,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+    url: '',
+    isDemo: true,
   },
   {
     id: 'epic-orchestra',
@@ -139,7 +145,8 @@ const FREE_MUSIC_TRACKS = [
     genre: 'Cinematic',
     mood: 'Epický',
     duration: 180,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+    url: '',
+    isDemo: true,
   },
   {
     id: 'chill-ambient',
@@ -147,7 +154,8 @@ const FREE_MUSIC_TRACKS = [
     genre: 'Ambient',
     mood: 'Klidný',
     duration: 110,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+    url: '',
+    isDemo: true,
   },
   {
     id: 'uplifting-pop',
@@ -155,7 +163,8 @@ const FREE_MUSIC_TRACKS = [
     genre: 'Pop',
     mood: 'Optimistický',
     duration: 95,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
+    url: '',
+    isDemo: true,
   },
   {
     id: 'energetic-rock',
@@ -163,7 +172,8 @@ const FREE_MUSIC_TRACKS = [
     genre: 'Rock',
     mood: 'Energický',
     duration: 115,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+    url: '',
+    isDemo: true,
   },
   {
     id: 'smooth-jazz',
@@ -171,7 +181,8 @@ const FREE_MUSIC_TRACKS = [
     genre: 'Jazz',
     mood: 'Relaxační',
     duration: 200,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
+    url: '',
+    isDemo: true,
   },
   {
     id: 'dance-electronic',
@@ -179,7 +190,8 @@ const FREE_MUSIC_TRACKS = [
     genre: 'Dance',
     mood: 'Taneční',
     duration: 140,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
+    url: '',
+    isDemo: true,
   },
 ]
 
@@ -788,31 +800,46 @@ export function VideoGenerator() {
                   Hudba (volitelné)
                 </h3>
                 
-                {/* Free tracks */}
+                {/* Upload custom - PRIMARY */}
+                <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => audioInputRef.current?.click()}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Upload className="w-3 h-3 mr-1" />
+                      Nahrát vlastní MP3
+                    </Button>
+                    {audioUrl && (
+                      <span className="text-xs text-green-600 font-medium">✓ Audio nahráno</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-purple-600 mt-2">
+                    Doporučeno: Nahrajte vlastní royalty-free hudbu
+                  </p>
+                </div>
+                
+                {/* Demo tracks - secondary */}
+                <div className="mb-2">
+                  <p className="text-[10px] text-gray-500 mb-2">Nebo vyberte placeholder (pouze pro náhled):</p>
+                </div>
                 <div className="grid grid-cols-3 gap-2 mb-3">
-                  {FREE_MUSIC_TRACKS.map((track) => (
+                  {FREE_MUSIC_TRACKS.slice(0, 6).map((track) => (
                     <button
                       key={track.id}
                       onClick={() => selectFreeTrack(track)}
                       className={cn(
-                        'p-2 rounded-lg text-left border transition-all',
+                        'p-2 rounded-lg text-left border transition-all opacity-60 hover:opacity-100',
                         selectedFreeTrack?.id === track.id
-                          ? 'border-purple-500 bg-purple-50'
+                          ? 'border-purple-500 bg-purple-50 opacity-100'
                           : 'border-gray-200 hover:border-gray-300'
                       )}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-medium truncate">{track.name}</span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); togglePreview(track) }}
-                          className="p-1 hover:bg-gray-200 rounded"
-                        >
-                          {previewingTrack?.id === track.id ? (
-                            <Pause className="w-3 h-3" />
-                          ) : (
-                            <Play className="w-3 h-3" />
-                          )}
-                        </button>
+                        <span className="text-[9px] bg-gray-200 px-1 rounded">Demo</span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-gray-500">
                         <span>{track.mood}</span>
@@ -821,21 +848,6 @@ export function VideoGenerator() {
                       </div>
                     </button>
                   ))}
-                </div>
-                
-                {/* Upload custom */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => audioInputRef.current?.click()}
-                  >
-                    <Upload className="w-3 h-3 mr-1" />
-                    Vlastní MP3
-                  </Button>
-                  {audioUrl && !selectedFreeTrack && (
-                    <span className="text-xs text-green-600">✓ Vlastní audio nahráno</span>
-                  )}
                 </div>
                 
                 <input

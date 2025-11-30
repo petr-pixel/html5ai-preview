@@ -143,6 +143,17 @@ export interface FormatOutputSettings {
 }
 
 /**
+ * Per-format text override - umožňuje jemné doladění textu pro každý formát
+ */
+export interface PerFormatTextSettings {
+  fontSizeMultiplier: number  // 0.5 - 2.0, default 1.0
+  hideHeadline?: boolean
+  hideSubheadline?: boolean
+  hideCta?: boolean
+  customPosition?: 'top-left' | 'top-center' | 'top-right' | 'center' | 'bottom-left' | 'bottom-center' | 'bottom-right'
+}
+
+/**
  * Vygenerovaná kreativa
  */
 export interface Creative {
@@ -167,6 +178,9 @@ export interface Creative {
   // Prošla validací?
   isValid?: boolean
   validationErrors?: string[]
+  // Je to zdrojový AI obrázek?
+  isSource?: boolean
+  prompt?: string
 }
 
 // ============================================================================
@@ -447,6 +461,11 @@ export interface AppState {
   // Text Overlay
   textOverlay: TextOverlay
   setTextOverlay: (overlay: Partial<TextOverlay>) => void
+  
+  // Per-format text settings
+  perFormatTextSettings: Record<string, PerFormatTextSettings>
+  setPerFormatTextSettings: (formatKey: string, settings: Partial<PerFormatTextSettings>) => void
+  resetPerFormatTextSettings: () => void
   
   // Watermark
   watermark: Watermark

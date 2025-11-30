@@ -151,6 +151,17 @@ export const useAppStore = create<AppState>()(
           state.textOverlay = { ...state.textOverlay, ...overlay }
         }),
 
+      // Per-format text settings
+      perFormatTextSettings: {} as Record<string, { fontSizeMultiplier: number; hideHeadline?: boolean; hideSubheadline?: boolean; hideCta?: boolean; customPosition?: string }>,
+      setPerFormatTextSettings: (formatKey, settings) =>
+        set((state) => {
+          if (!state.perFormatTextSettings[formatKey]) {
+            state.perFormatTextSettings[formatKey] = { fontSizeMultiplier: 1.0 }
+          }
+          state.perFormatTextSettings[formatKey] = { ...state.perFormatTextSettings[formatKey], ...settings }
+        }),
+      resetPerFormatTextSettings: () => set({ perFormatTextSettings: {} }),
+
       // Watermark
       watermark: defaultWatermark,
       setWatermark: (watermark) =>

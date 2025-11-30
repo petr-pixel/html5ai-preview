@@ -25,6 +25,7 @@ import { VideoGenerator } from '@/components/VideoGenerator'
 import { QuickMode } from '@/components/QuickMode'
 import { SafeZoneOverlay } from '@/components/SafeZoneOverlay'
 import { ImagePositionControl } from '@/components/ImagePositionControl'
+import { PerFormatTextEditor } from '@/components/PerFormatTextEditor'
 import { downloadBlob, createCreativePackZip } from '@/lib/export'
 import { calculateSmartCrop } from '@/lib/smart-crop'
 import { Button, Progress, Spinner } from '@/components/ui'
@@ -125,6 +126,7 @@ export default function App() {
     activeBrandKit,
     cropMode,
     formatOffsets,
+    perFormatTextSettings,
     r2Config,
     setPlatform,
     setCategory,
@@ -218,7 +220,27 @@ export default function App() {
       // GPT-4o returns b64_json in data[0].b64_json
       const b64 = data?.data?.[0]?.b64_json
       if (b64) {
-        setSourceImage(`data:image/png;base64,${b64}`)
+        const imageUrl = `data:image/png;base64,${b64}`
+        setSourceImage(imageUrl)
+        
+        // Uložit do galerie jako "zdrojový" obrázek
+        const sourceCreative: Creative = {
+          id: generateId(),
+          formatKey: `source-${sourceFormat}`,
+          platform: platform,
+          category: 'source',
+          format: { 
+            width: sourceFormat === 'landscape' ? 1536 : sourceFormat === 'portrait' ? 1024 : 1024, 
+            height: sourceFormat === 'landscape' ? 1024 : sourceFormat === 'portrait' ? 1536 : 1024, 
+            name: `AI Source (${sourceFormat})` 
+          },
+          imageUrl: imageUrl,
+          createdAt: new Date(),
+          prompt: prompt,
+          isSource: true,
+        }
+        addCreatives([sourceCreative])
+        
         setProgress(100)
         return
       }
@@ -227,6 +249,25 @@ export default function App() {
       const url = data?.data?.[0]?.url
       if (url) {
         setSourceImage(url)
+        
+        // Uložit do galerie
+        const sourceCreative: Creative = {
+          id: generateId(),
+          formatKey: `source-${sourceFormat}`,
+          platform: platform,
+          category: 'source',
+          format: { 
+            width: sourceFormat === 'landscape' ? 1536 : sourceFormat === 'portrait' ? 1024 : 1024, 
+            height: sourceFormat === 'landscape' ? 1024 : sourceFormat === 'portrait' ? 1536 : 1024, 
+            name: `AI Source (${sourceFormat})` 
+          },
+          imageUrl: url,
+          createdAt: new Date(),
+          prompt: prompt,
+          isSource: true,
+        }
+        addCreatives([sourceCreative])
+        
         setProgress(100)
         return
       }
@@ -684,7 +725,8 @@ export default function App() {
 
         // Draw text overlay
         if (textOverlay.enabled) {
-          drawTextOverlay(ctx, textOverlay, fmt.width, fmt.height, currentBrandKit)
+          const formatTextSettings = perFormatTextSettings[formatKey]
+          drawTextOverlay(ctx, textOverlay, fmt.width, fmt.height, currentBrandKit, formatTextSettings)
         }
 
         // Draw watermark (logo from Brand Kit)
@@ -877,17 +919,23 @@ export default function App() {
                 onClick={() => setCategory(key)}
                 className={cn(
                   'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all',
+                  // Disable branding a interscroller
+                  (key === 'branding' || key === 'interscroller') && 'opacity-50 cursor-not-allowed',
                   category === key
                     ? 'bg-blue-50 text-[#1a73e8]'
                     : 'text-gray-600 hover:bg-gray-50'
                 )}
+                disabled={key === 'branding' || key === 'interscroller'}
               >
                 <span className="text-lg">{cat.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{cat.name}</div>
                   <div className="text-xs text-gray-500 truncate">max {cat.maxSizeKB} kB</div>
                 </div>
-                {cat.type === 'branding' && (
+                {(key === 'branding' || key === 'interscroller') && (
+                  <span className="px-1.5 py-0.5 bg-orange-100 text-orange-600 text-[10px] rounded-full font-medium">SOON</span>
+                )}
+                {cat.type === 'branding' && key !== 'branding' && key !== 'interscroller' && (
                   <span className="badge-yellow text-[10px]">Safe Zone</span>
                 )}
                 {cat.type === 'video' && (
@@ -1032,6 +1080,7 @@ export default function App() {
                   onApplyToImage={applyTextToSourceImage}
                   isGenerating={isGenerating} 
                 />
+                <PerFormatTextEditor />
                 <WatermarkEditor 
                   onApplyToImage={applyLogoToSourceImage}
                   isGenerating={isGenerating}
@@ -1046,6 +1095,7 @@ export default function App() {
                   onApplyToImage={applyTextToSourceImage}
                   isGenerating={isGenerating} 
                 />
+                <PerFormatTextEditor />
                 {/* Safe Zone info */}
                 <div className="p-4 border-b border-gray-100">
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
@@ -1293,279 +1343,240 @@ function drawTextOverlay(
   overlay: TextOverlay,
   width: number,
   height: number,
-  brandKit?: { ctaColor?: string; headlineFont?: string; textColor?: string }
+  brandKit?: { ctaColor?: string; headlineFont?: string; textColor?: string },
+  perFormatSettings?: { fontSizeMultiplier?: number; hideHeadline?: boolean; hideSubheadline?: boolean; hideCta?: boolean; customPosition?: string }
 ) {
   if (!overlay.headline && !overlay.subheadline && !overlay.cta) {
     return
   }
 
-  // Detect banner aspect ratio for smart sizing
+  // Per-format overrides
+  const fontSizeMultiplier = perFormatSettings?.fontSizeMultiplier || 1.0
+  const hideHeadline = perFormatSettings?.hideHeadline || false
+  const hideSubheadline = perFormatSettings?.hideSubheadline || false
+  const hideCta = perFormatSettings?.hideCta || false
+  const positionOverride = perFormatSettings?.customPosition
+
   const aspectRatio = width / height
-  const isWide = aspectRatio > 2.5  // Leaderboard, Billboard (970x90, 970x250)
-  const isTall = aspectRatio < 0.6  // Skyscraper, Half Page (160x600, 300x600)
-  const isSmall = width <= 320 || height <= 100  // Mobile Banner, small formats
+  const isWide = aspectRatio > 3  // Leaderboard 728x90, Billboard 970x90
+  const isSemiWide = aspectRatio > 2 && aspectRatio <= 3  // 970x250, 970x310
+  const isTall = aspectRatio < 0.6  // Skyscraper 160x600, Half Page 300x600
+  const isSemiTall = aspectRatio >= 0.6 && aspectRatio < 0.8  // 300x250 ish
+  const isSmall = width <= 320 || height <= 100
   const isVerySmall = width <= 200 || height <= 60
 
-  const padding = Math.min(width, height) * 0.06
+  const padding = Math.max(8, Math.min(width, height) * 0.05)
   const fontFamily = brandKit?.headlineFont || 'Arial, Helvetica, sans-serif'
   const textColor = brandKit?.textColor || '#ffffff'
   const ctaColor = overlay.ctaColor || brandKit?.ctaColor || '#ff6600'
 
-  // Smart font sizing based on banner dimensions
-  let baseSize: number
-  if (isVerySmall) {
-    baseSize = Math.min(width, height) * 1.2
-  } else if (isSmall) {
-    baseSize = Math.min(width, height) * 1.0
-  } else if (isWide) {
-    baseSize = height * 0.85
-  } else if (isTall) {
-    baseSize = width * 0.7
-  } else {
-    baseSize = Math.min(width, height) * 0.8
-  }
-
-  // Font size multipliers based on overlay.fontSize setting
+  // Dynamické velikosti fontů podle formátu
   const sizeMultipliers = {
-    small: { headline: 0.18, sub: 0.12, cta: 0.10 },
-    medium: { headline: 0.24, sub: 0.15, cta: 0.12 },
-    large: { headline: 0.30, sub: 0.18, cta: 0.14 },
+    small: { headline: 0.14, sub: 0.10, cta: 0.09 },
+    medium: { headline: 0.18, sub: 0.12, cta: 0.10 },
+    large: { headline: 0.22, sub: 0.14, cta: 0.12 },
   }
-  const multiplier = sizeMultipliers[overlay.fontSize] || sizeMultipliers.medium
-  
-  // Calculate actual font sizes with appropriate min/max bounds
-  const size = {
-    headline: Math.max(10, Math.min(baseSize * multiplier.headline, 64)),
-    sub: Math.max(8, Math.min(baseSize * multiplier.sub, 40)),
-    cta: Math.max(8, Math.min(baseSize * multiplier.cta, 28)),
+  const mult = sizeMultipliers[overlay.fontSize] || sizeMultipliers.medium
+
+  let headlineSize: number
+  let subSize: number
+  let ctaSize: number
+
+  if (isVerySmall) {
+    // Velmi malé: jen headline nebo CTA
+    headlineSize = Math.min(height * 0.35, width * 0.08)
+    subSize = 0
+    ctaSize = Math.min(height * 0.25, width * 0.06)
+  } else if (isWide) {
+    // Široké (728x90, 970x90): velikost podle výšky
+    headlineSize = height * 0.32 * (mult.headline / 0.18)
+    subSize = height * 0.20 * (mult.sub / 0.12)
+    ctaSize = height * 0.22 * (mult.cta / 0.10)
+  } else if (isSemiWide) {
+    // Pološirké (970x250): mix
+    headlineSize = Math.min(height * 0.15, width * 0.035) * (mult.headline / 0.18)
+    subSize = Math.min(height * 0.10, width * 0.025) * (mult.sub / 0.12)
+    ctaSize = Math.min(height * 0.10, width * 0.022) * (mult.cta / 0.10)
+  } else if (isTall) {
+    // Vysoké (160x600, 300x600): velikost podle šířky
+    headlineSize = width * 0.14 * (mult.headline / 0.18)
+    subSize = width * 0.09 * (mult.sub / 0.12)
+    ctaSize = width * 0.10 * (mult.cta / 0.10)
+  } else if (isSmall) {
+    // Malé (320x100, 320x50)
+    headlineSize = Math.min(height * 0.28, width * 0.07)
+    subSize = Math.min(height * 0.18, width * 0.045)
+    ctaSize = Math.min(height * 0.20, width * 0.05)
+  } else {
+    // Normální čtvercové/obdélníkové
+    const base = Math.min(width, height)
+    headlineSize = base * mult.headline
+    subSize = base * mult.sub
+    ctaSize = base * mult.cta
   }
 
-  // Pro malé formáty - jen CTA nebo jen headline
-  const showHeadline = !isVerySmall
-  const showSubheadline = !isSmall && !isWide
-  const showCta = overlay.cta && size.cta >= 8
+  // Aplikuj per-format multiplier
+  headlineSize *= fontSizeMultiplier
+  subSize *= fontSizeMultiplier
+  ctaSize *= fontSizeMultiplier
 
-  // Calculate total text block height
+  // Limity
+  headlineSize = Math.max(10, Math.min(headlineSize, 56))
+  subSize = Math.max(8, Math.min(subSize, 32))
+  ctaSize = Math.max(8, Math.min(ctaSize, 24))
+
+  // Co zobrazit (respektuj per-format hide flags)
+  const showHeadline = !isVerySmall && overlay.headline && !hideHeadline
+  const showSubheadline = !isSmall && !isWide && overlay.subheadline && !hideSubheadline
+  const showCta = overlay.cta && ctaSize >= 8 && !hideCta
+
+  // Word wrap helper
+  const wrapText = (text: string, maxWidth: number, fontSize: number): string[] => {
+    ctx.font = `bold ${fontSize}px ${fontFamily}`
+    const words = text.split(' ')
+    const lines: string[] = []
+    let line = ''
+    
+    for (const word of words) {
+      const testLine = line ? `${line} ${word}` : word
+      if (ctx.measureText(testLine).width > maxWidth && line) {
+        lines.push(line)
+        line = word
+      } else {
+        line = testLine
+      }
+    }
+    if (line) lines.push(line)
+    return lines
+  }
+
+  // Vypočítej max šířku textu
+  const maxTextWidth = width - padding * 2
+
+  // Připrav řádky
+  const headlineLines = showHeadline ? wrapText(overlay.headline, maxTextWidth, headlineSize) : []
+  const subLines = showSubheadline ? wrapText(overlay.subheadline!, maxTextWidth, subSize) : []
+
+  // Vypočítej celkovou výšku bloku
   let blockHeight = 0
-  if (showHeadline && overlay.headline) blockHeight += size.headline * 1.3
-  if (showSubheadline && overlay.subheadline) blockHeight += size.sub * 1.4
-  if (showCta) blockHeight += size.cta * 2.5
+  if (headlineLines.length) blockHeight += headlineLines.length * headlineSize * 1.15 + 4
+  if (subLines.length) blockHeight += subLines.length * subSize * 1.15 + 4
+  if (showCta) blockHeight += ctaSize * 2.2
 
-  // For wide banners, stack horizontally if needed
-  const useHorizontalLayout = isWide && blockHeight > height * 0.8
-
-  // Calculate starting position
-  const position = overlay.position || 'bottom-left'
+  // Pozice (s možným per-format override)
+  const position = positionOverride || overlay.position || 'bottom-left'
   let x = padding
-  let y = padding
+  let startY = padding
   let align: CanvasTextAlign = 'left'
 
-  if (useHorizontalLayout) {
-    // Wide banner: center everything vertically
-    y = (height - size.headline) / 2
-    switch (position) {
-      case 'top-left':
-      case 'bottom-left':
-        x = padding
-        align = 'left'
-        break
-      case 'top-center':
-      case 'center':
-      case 'bottom-center':
-        x = width / 2
-        align = 'center'
-        break
-      case 'top-right':
-      case 'bottom-right':
-        x = width - padding
-        align = 'right'
-        break
-    }
-  } else {
-    // Normal vertical stacking
-    switch (position) {
-      case 'top-left':
-        x = padding
-        y = padding
-        align = 'left'
-        break
-      case 'top-center':
-        x = width / 2
-        y = padding
-        align = 'center'
-        break
-      case 'top-right':
-        x = width - padding
-        y = padding
-        align = 'right'
-        break
-      case 'center':
-        x = width / 2
-        y = (height - blockHeight) / 2
-        align = 'center'
-        break
-      case 'bottom-left':
-        x = padding
-        y = height - padding - blockHeight
-        align = 'left'
-        break
-      case 'bottom-center':
-        x = width / 2
-        y = height - padding - blockHeight
-        align = 'center'
-        break
-      case 'bottom-right':
-        x = width - padding
-        y = height - padding - blockHeight
-        align = 'right'
-        break
-      default:
-        x = width / 2
-        y = (height - blockHeight) / 2
-        align = 'center'
-    }
+  // Horizontální pozice
+  if (position.includes('right')) {
+    x = width - padding
+    align = 'right'
+  } else if (position.includes('center') || position === 'center') {
+    x = width / 2
+    align = 'center'
   }
+
+  // Vertikální pozice
+  if (position.includes('bottom')) {
+    startY = height - padding - blockHeight
+  } else if (position === 'center') {
+    startY = (height - blockHeight) / 2
+  }
+
+  // Ujisti se že nezačínáme mimo canvas
+  startY = Math.max(padding / 2, Math.min(startY, height - blockHeight - padding / 2))
 
   ctx.textAlign = align
-  let currentY = y
+  ctx.textBaseline = 'top'
+  let currentY = startY
 
-  // Draw headline
-  if (showHeadline && overlay.headline) {
-    ctx.font = `bold ${Math.round(size.headline)}px ${fontFamily}`
+  // Headline
+  if (headlineLines.length > 0) {
+    ctx.font = `bold ${Math.round(headlineSize)}px ${fontFamily}`
     ctx.fillStyle = textColor
-    
-    // Text shadow for readability
     ctx.shadowColor = 'rgba(0,0,0,0.8)'
-    ctx.shadowBlur = Math.max(2, size.headline * 0.1)
+    ctx.shadowBlur = Math.max(2, headlineSize * 0.08)
     ctx.shadowOffsetX = 1
     ctx.shadowOffsetY = 1
-    
-    ctx.textBaseline = 'top'
-    
-    // Word wrap for tall/narrow formats
-    if (isTall) {
-      const words = overlay.headline.split(' ')
-      const maxWidth = width - padding * 2
-      let line = ''
-      const lines: string[] = []
-      
-      for (const word of words) {
-        const testLine = line ? `${line} ${word}` : word
-        const metrics = ctx.measureText(testLine)
-        if (metrics.width > maxWidth && line) {
-          lines.push(line)
-          line = word
-        } else {
-          line = testLine
-        }
-      }
-      if (line) lines.push(line)
-      
-      for (const lineText of lines) {
-        ctx.fillText(lineText, x, currentY)
-        currentY += size.headline * 1.2
-      }
-      currentY += size.headline * 0.1
-    } else {
-      ctx.fillText(overlay.headline, x, currentY)
-      currentY += size.headline * 1.3
+
+    for (const line of headlineLines) {
+      ctx.fillText(line, x, currentY)
+      currentY += headlineSize * 1.15
     }
+    currentY += 4
   }
 
-  // Draw subheadline (skip for small or wide banners)
-  if (showSubheadline && overlay.subheadline) {
-    ctx.font = `${Math.round(size.sub)}px ${fontFamily}`
+  // Subheadline
+  if (subLines.length > 0) {
+    ctx.font = `${Math.round(subSize)}px ${fontFamily}`
     ctx.fillStyle = textColor
     ctx.shadowColor = 'rgba(0,0,0,0.6)'
-    ctx.shadowBlur = Math.max(1, size.sub * 0.08)
-    ctx.textBaseline = 'top'
-    
-    // Word wrap for tall formats
-    if (isTall) {
-      const words = overlay.subheadline.split(' ')
-      const maxWidth = width - padding * 2
-      let line = ''
-      const lines: string[] = []
-      
-      for (const word of words) {
-        const testLine = line ? `${line} ${word}` : word
-        const metrics = ctx.measureText(testLine)
-        if (metrics.width > maxWidth && line) {
-          lines.push(line)
-          line = word
-        } else {
-          line = testLine
-        }
-      }
-      if (line) lines.push(line)
-      
-      for (const lineText of lines) {
-        ctx.fillText(lineText, x, currentY)
-        currentY += size.sub * 1.2
-      }
-      currentY += size.sub * 0.2
-    } else {
-      ctx.fillText(overlay.subheadline, x, currentY)
-      currentY += size.sub * 1.4
+    ctx.shadowBlur = Math.max(1, subSize * 0.06)
+
+    for (const line of subLines) {
+      ctx.fillText(line, x, currentY)
+      currentY += subSize * 1.15
     }
+    currentY += 4
   }
 
-  // Reset shadow before CTA
+  // Reset shadow
   ctx.shadowColor = 'transparent'
   ctx.shadowBlur = 0
   ctx.shadowOffsetX = 0
   ctx.shadowOffsetY = 0
 
-  // Draw CTA Button
+  // CTA Button
   if (showCta && overlay.cta) {
-    ctx.font = `bold ${Math.round(size.cta)}px ${fontFamily}`
-    const ctaTextWidth = ctx.measureText(overlay.cta).width
-    const ctaPaddingX = Math.max(size.cta * 0.6, 6)
-    const ctaPaddingY = Math.max(size.cta * 0.35, 4)
-    const ctaWidth = ctaTextWidth + ctaPaddingX * 2
-    const ctaHeight = size.cta + ctaPaddingY * 2
-    const ctaRadius = Math.min(ctaHeight / 2.5, 6)
-
-    // Make sure CTA fits in the banner
-    const maxCtaWidth = width - padding * 2
-    const scaledCtaWidth = Math.min(ctaWidth, maxCtaWidth)
+    ctx.font = `bold ${Math.round(ctaSize)}px ${fontFamily}`
+    let ctaText = overlay.cta
+    let ctaTextWidth = ctx.measureText(ctaText).width
     
-    // Calculate CTA X position based on alignment
-    let ctaX = x
-    if (align === 'center') {
-      ctaX = x - scaledCtaWidth / 2
-    } else if (align === 'right') {
-      ctaX = x - scaledCtaWidth
+    // Zkrať text pokud je moc dlouhý
+    const maxCtaTextWidth = maxTextWidth - ctaSize * 1.2
+    if (ctaTextWidth > maxCtaTextWidth) {
+      // Zmenši font
+      const scaleFactor = maxCtaTextWidth / ctaTextWidth
+      ctaSize = Math.max(8, ctaSize * scaleFactor)
+      ctx.font = `bold ${Math.round(ctaSize)}px ${fontFamily}`
+      ctaTextWidth = ctx.measureText(ctaText).width
     }
 
-    // Ensure CTA doesn't overflow
-    ctaX = Math.max(padding / 2, Math.min(ctaX, width - scaledCtaWidth - padding / 2))
-    currentY = Math.min(currentY, height - ctaHeight - padding / 2)
+    const ctaPaddingX = Math.max(ctaSize * 0.5, 6)
+    const ctaPaddingY = Math.max(ctaSize * 0.3, 4)
+    const ctaWidth = ctaTextWidth + ctaPaddingX * 2
+    const ctaHeight = ctaSize + ctaPaddingY * 2
+    const ctaRadius = Math.min(ctaHeight / 2.5, 6)
 
-    // Draw button background
+    // CTA pozice
+    let ctaX = x
+    if (align === 'center') {
+      ctaX = x - ctaWidth / 2
+    } else if (align === 'right') {
+      ctaX = x - ctaWidth
+    }
+
+    // Clamp do banneru
+    ctaX = Math.max(padding / 2, Math.min(ctaX, width - ctaWidth - padding / 2))
+    const ctaY = Math.min(currentY, height - ctaHeight - padding / 2)
+
+    // Kresli button
     ctx.fillStyle = ctaColor
-    drawRoundedRect(ctx, ctaX, currentY, scaledCtaWidth, ctaHeight, ctaRadius)
+    drawRoundedRect(ctx, ctaX, ctaY, ctaWidth, ctaHeight, ctaRadius)
     ctx.fill()
 
-    // Draw button text (centered in button)
+    // Text
     ctx.fillStyle = '#ffffff'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    
-    // Scale font if text is too wide
-    if (ctaTextWidth > scaledCtaWidth - ctaPaddingX * 2) {
-      const scaleFactor = (scaledCtaWidth - ctaPaddingX * 2) / ctaTextWidth
-      ctx.font = `bold ${Math.round(size.cta * scaleFactor)}px ${fontFamily}`
-    }
-    
-    ctx.fillText(overlay.cta, ctaX + scaledCtaWidth / 2, currentY + ctaHeight / 2)
+    ctx.fillText(ctaText, ctaX + ctaWidth / 2, ctaY + ctaHeight / 2)
   }
 
-  // Reset context
+  // Reset
   ctx.shadowColor = 'transparent'
   ctx.shadowBlur = 0
-  ctx.shadowOffsetX = 0
-  ctx.shadowOffsetY = 0
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
 }
