@@ -214,9 +214,94 @@ export interface BrandKit {
   // Fonty
   headlineFont?: string
   bodyFont?: string
+  // Default CTA pro různé jazyky
+  defaultCTA?: Record<string, string>  // { cs: "Nakoupit", sk: "Nakúpiť", de: "Kaufen" }
   // Metadata
   createdAt: Date
   isDefault: boolean
+}
+
+// ============================================================================
+// CAMPAIGN TEMPLATES
+// ============================================================================
+
+export interface CampaignTemplate {
+  id: string
+  name: string
+  description: string
+  // Defaultní texty pro různé jazyky
+  headlines: Record<string, string[]>      // { cs: ["Sleva %X%", "Akce %X%"], sk: [...] }
+  subheadlines: Record<string, string[]>   // { cs: ["Platí do %DATE%"], sk: [...] }
+  ctas: Record<string, string[]>           // { cs: ["Nakoupit", "Zobrazit"], sk: [...] }
+  // Proměnné které se doplňují
+  variables: string[]                       // ["X", "DATE", "PRODUCT"]
+  // Doporučené formáty
+  recommendedFormats: {
+    google: string[]   // ["banners", "pmax"]
+    sklik: string[]    // ["banners", "kombinovana"]
+  }
+  // Default landing page pattern
+  defaultUrlPattern?: string  // "/sale/" nebo "/akce/"
+  // Kategorie šablony
+  category: 'sale' | 'new_collection' | 'brand' | 'seasonal' | 'custom'
+}
+
+// ============================================================================
+// QUICK MODE
+// ============================================================================
+
+export type SupportedLanguage = 'cs' | 'sk' | 'de' | 'hu' | 'ro' | 'si' | 'hr' | 'en'
+
+export interface QuickModeConfig {
+  // Brand & Template
+  brandKitId: string | null
+  templateId: string | null
+  // Kampaň
+  campaignName: string
+  landingUrl: string
+  briefDescription: string  // "Zimní bundy -20%, důraz na teplo a kvalitu"
+  // Proměnné z šablony
+  variables: Record<string, string>  // { X: "20", DATE: "31.12.", PRODUCT: "bundy" }
+  // Jazyky
+  languages: SupportedLanguage[]
+  // Kanály
+  channels: {
+    googleDisplay: boolean
+    googlePMax: boolean
+    googleYouTube: boolean
+    googleDemandGen: boolean
+    sklikBannery: boolean
+    sklikKombinovana: boolean
+    sklikHTML5: boolean
+  }
+  // Generovat i texty pro RSA?
+  generateRSATexts: boolean
+  // Generovat video?
+  generateVideo: boolean
+  videoLength: 6 | 15 | 30
+}
+
+export interface QuickModeOutput {
+  // Strukturované výstupy
+  bundles: {
+    language: SupportedLanguage
+    channel: string
+    formats: Creative[]
+    zipBlob?: Blob
+    csvContent?: string
+  }[]
+  // Texty pro RSA
+  rsaTexts?: {
+    language: SupportedLanguage
+    headlines: string[]      // 15 variant
+    descriptions: string[]   // 4 varianty
+  }[]
+  // Video scénáře
+  videoScenarios?: {
+    language: SupportedLanguage
+    aspectRatio: '16:9' | '9:16' | '1:1'
+    script: string
+  }[]
 }
 
 // ============================================================================

@@ -12,10 +12,11 @@ import {
   FolderOpen, 
   Settings,
   ChevronRight,
-  Zap
+  Zap,
+  Rocket
 } from 'lucide-react'
 
-export type NavigationView = 'dashboard' | 'editor' | 'video' | 'brandkits' | 'library' | 'settings'
+export type NavigationView = 'dashboard' | 'quickmode' | 'editor' | 'video' | 'brandkits' | 'library' | 'settings'
 
 interface SidebarProps {
   currentView: NavigationView
@@ -30,8 +31,14 @@ const navigationItems = [
     icon: LayoutDashboard,
   },
   { 
+    id: 'quickmode' as const, 
+    label: 'Quick Mode', 
+    icon: Rocket,
+    badge: 'NEW',
+  },
+  { 
     id: 'editor' as const, 
-    label: 'Tvorba kreativ', 
+    label: 'Expert Editor', 
     icon: Sparkles,
   },
   { 
@@ -98,6 +105,11 @@ export function Sidebar({ currentView, onNavigate, onOpenSettings }: SidebarProp
                 )}>
                   {item.label}
                 </span>
+                {'badge' in item && item.badge && (
+                  <span className="text-[10px] font-bold bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-1.5 py-0.5 rounded">
+                    {item.badge}
+                  </span>
+                )}
                 {item.id === 'library' && creativesCount > 0 && (
                   <span className="text-[11px] font-medium bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
                     {creativesCount}

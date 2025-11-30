@@ -20,6 +20,7 @@ import { QRCodeEditor } from '@/components/QRCodeEditor'
 import { GalleryView } from '@/components/GalleryView'
 import { BrandKitManager } from '@/components/BrandKitManager'
 import { VideoGenerator } from '@/components/VideoGenerator'
+import { QuickMode } from '@/components/QuickMode'
 import { SafeZoneOverlay } from '@/components/SafeZoneOverlay'
 import { downloadBlob, createCreativePackZip } from '@/lib/export'
 import { calculateSmartCrop } from '@/lib/smart-crop'
@@ -878,6 +879,7 @@ export default function App() {
 
       <main className="main-content flex flex-col">
         {currentView === 'dashboard' && renderDashboard()}
+        {currentView === 'quickmode' && <QuickMode />}
         {currentView === 'editor' && renderEditor()}
         {currentView === 'video' && renderVideoStudio()}
         {currentView === 'library' && renderLibrary()}
