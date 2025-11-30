@@ -309,8 +309,10 @@ export async function generateSlideshowMP4(
   
   onProgress?.(95, 'Načítám výsledek...')
   
-  const outputData = await ffmpeg.readFile('output.mp4') as Uint8Array
-  const videoBlob = new Blob([outputData], { type: 'video/mp4' })
+  const outputData = await ffmpeg.readFile('output.mp4')
+  // Vytvoř ArrayBuffer kopii pro Blob kompatibilitu
+  const arrayBuffer = (outputData as Uint8Array).slice().buffer
+  const videoBlob = new Blob([arrayBuffer], { type: 'video/mp4' })
   
   onProgress?.(100, 'Hotovo!')
   
@@ -720,7 +722,8 @@ export async function convertToMP4(webmBlob: Blob): Promise<Blob> {
     ])
     
     const mp4Data = await ffmpeg.readFile('output.mp4')
-    return new Blob([new Uint8Array(mp4Data as ArrayBuffer)], { type: 'video/mp4' })
+    const arrayBuffer = (mp4Data as Uint8Array).slice().buffer
+    return new Blob([arrayBuffer], { type: 'video/mp4' })
   } catch (e) {
     console.warn('MP4 konverze selhala:', e)
     return webmBlob
