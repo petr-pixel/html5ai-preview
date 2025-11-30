@@ -162,6 +162,18 @@ export const useAppStore = create<AppState>()(
         }),
       resetPerFormatTextSettings: () => set({ perFormatTextSettings: {} }),
 
+      // Outpainted images per format
+      outpaintedImages: {} as Record<string, string>,
+      setOutpaintedImage: (formatKey, imageUrl) =>
+        set((state) => {
+          state.outpaintedImages[formatKey] = imageUrl
+        }),
+      clearOutpaintedImage: (formatKey) =>
+        set((state) => {
+          delete state.outpaintedImages[formatKey]
+        }),
+      clearAllOutpaintedImages: () => set({ outpaintedImages: {} }),
+
       // Watermark
       watermark: defaultWatermark,
       setWatermark: (watermark) =>

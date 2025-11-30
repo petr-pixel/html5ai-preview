@@ -63,6 +63,9 @@ export function FormatEditor({ formatKey, format, sourceImage, onClose }: Format
     addCreatives,
     brandKits,
     activeBrandKit,
+    outpaintedImages,
+    setOutpaintedImage: setGlobalOutpaintedImage,
+    clearOutpaintedImage,
   } = useAppStore()
 
   // Lokální stav
@@ -83,7 +86,7 @@ export function FormatEditor({ formatKey, format, sourceImage, onClose }: Format
   
   // Outpainting state
   const [isOutpainting, setIsOutpainting] = useState(false)
-  const [outpaintedImage, setOutpaintedImage] = useState<string | null>(null)
+  const outpaintedImage = outpaintedImages[formatKey] || null
   const [hasEmptySpace, setHasEmptySpace] = useState(false)
   
   // Saving state
@@ -128,25 +131,30 @@ export function FormatEditor({ formatKey, format, sourceImage, onClose }: Format
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, format.width, format.height)
 
-      // Draw image with offset
-      const imgAspect = img.width / img.height
-      const canvasAspect = format.width / format.height
-
-      let drawWidth, drawHeight, drawX, drawY
-
-      if (imgAspect > canvasAspect) {
-        drawHeight = format.height
-        drawWidth = drawHeight * imgAspect
-        drawX = (format.width - drawWidth) / 2 + (imageOffset.x / 100) * drawWidth
-        drawY = (imageOffset.y / 100) * drawHeight
+      // Pokud je outpainted obrázek, nakresli ho přímo (už má správné rozměry)
+      if (outpaintedImage) {
+        ctx.drawImage(img, 0, 0, format.width, format.height)
       } else {
-        drawWidth = format.width
-        drawHeight = drawWidth / imgAspect
-        drawX = (imageOffset.x / 100) * drawWidth
-        drawY = (format.height - drawHeight) / 2 + (imageOffset.y / 100) * drawHeight
-      }
+        // Původní obrázek - aplikuj offset
+        const imgAspect = img.width / img.height
+        const canvasAspect = format.width / format.height
 
-      ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
+        let drawWidth, drawHeight, drawX, drawY
+
+        if (imgAspect > canvasAspect) {
+          drawHeight = format.height
+          drawWidth = drawHeight * imgAspect
+          drawX = (format.width - drawWidth) / 2 + (imageOffset.x / 100) * drawWidth
+          drawY = (imageOffset.y / 100) * drawHeight
+        } else {
+          drawWidth = format.width
+          drawHeight = drawWidth / imgAspect
+          drawX = (imageOffset.x / 100) * drawWidth
+          drawY = (format.height - drawHeight) / 2 + (imageOffset.y / 100) * drawHeight
+        }
+
+        ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
+      }
 
       // Draw text overlay
       if (textOverlay.enabled) {
@@ -361,8 +369,13 @@ export function FormatEditor({ formatKey, format, sourceImage, onClose }: Format
       )
       
       if (result.success && result.image) {
-        setOutpaintedImage(result.image)
+        // Uložit do globálního store
+        setGlobalOutpaintedImage(formatKey, result.image)
         setHasEmptySpace(false)
+        
+        if (result.usedFallback) {
+          console.log('Použit blur fallback místo AI outpaintingu')
+        }
       } else {
         alert(result.error || 'Nepodařilo se dopočítat pozadí')
       }
@@ -420,7 +433,7 @@ export function FormatEditor({ formatKey, format, sourceImage, onClose }: Format
     setHeadlinePos(null)
     setSubheadlinePos(null)
     setCtaPos(null)
-    setOutpaintedImage(null)
+    clearOutpaintedImage(formatKey)
   }
 
   // Start dragging element

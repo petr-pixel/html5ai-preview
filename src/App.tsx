@@ -22,6 +22,7 @@ import { QRCodeEditor } from '@/components/QRCodeEditor'
 import { GalleryView } from '@/components/GalleryView'
 import { BrandKitManager } from '@/components/BrandKitManager'
 import { VideoGenerator } from '@/components/VideoGenerator'
+import { SlideshowBuilder } from '@/components/SlideshowBuilder'
 import { QuickMode } from '@/components/QuickMode'
 import { SafeZoneOverlay } from '@/components/SafeZoneOverlay'
 import { ImagePositionControl } from '@/components/ImagePositionControl'
@@ -129,6 +130,7 @@ export default function App() {
     cropMode,
     formatOffsets,
     perFormatTextSettings,
+    outpaintedImages,
     r2Config,
     setPlatform,
     setCategory,
@@ -601,6 +603,9 @@ export default function App() {
         // Získej offset pro tento konkrétní formát
         const formatOffset = formatOffsets[formatKey] || { x: 0, y: 0 }
         
+        // Zkontroluj zda máme uložený outpainted obrázek z FormatEditoru
+        const savedOutpaintedImage = outpaintedImages[formatKey]
+        
         // Aplikuj ruční offset (v procentech, -50 až +50)
         const applyOffset = (crop: typeof cropResult) => {
           // Offset v pixelech - proporcionálně k velikosti cropu
@@ -617,7 +622,30 @@ export default function App() {
           }
         }
         
-        if (cropMode === 'fit') {
+        // Pokud máme uložený outpainted obrázek, použijeme ho přímo
+        if (savedOutpaintedImage) {
+          try {
+            const outpaintedImg = await loadImage(savedOutpaintedImage)
+            ctx.drawImage(outpaintedImg, 0, 0, fmt.width, fmt.height)
+          } catch {
+            // Fallback - nakresli původní obrázek s offsetem
+            ctx.fillStyle = currentBrandKit?.backgroundColor || '#ffffff'
+            ctx.fillRect(0, 0, fmt.width, fmt.height)
+            const srcRatioLocal = img.width / img.height
+            const tgtRatioLocal = fmt.width / fmt.height
+            let dW = fmt.width, dH = fmt.height, dX = 0, dY = 0
+            if (srcRatioLocal > tgtRatioLocal) {
+              dW = fmt.width
+              dH = fmt.width / srcRatioLocal
+              dY = (fmt.height - dH) / 2
+            } else {
+              dH = fmt.height
+              dW = fmt.height * srcRatioLocal
+              dX = (fmt.width - dW) / 2
+            }
+            ctx.drawImage(img, dX, dY, dW, dH)
+          }
+        } else if (cropMode === 'fit') {
           // FIT režim: zachovat celý obrázek, přidat padding pokud potřeba
           // Nebo použít AI outpainting pro rozšíření
           let drawWidth = fmt.width
@@ -1310,8 +1338,8 @@ export default function App() {
   )
 
   const renderVideoStudio = () => (
-    <div className="flex-1 overflow-y-auto">
-      <VideoGenerator />
+    <div className="flex-1 overflow-hidden">
+      <SlideshowBuilder />
     </div>
   )
 

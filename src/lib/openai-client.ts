@@ -577,14 +577,22 @@ export async function outpaintImage(
   config: OpenAIConfig,
   params: OutpaintingParams
 ): Promise<OutpaintingResult> {
+  // DALL-E 2 podporuje jen čtvercové obrázky: 1024x1024, 512x512, 256x256
+  const dalleSize = 1024
+  const scale = dalleSize / Math.max(params.targetWidth, params.targetHeight)
+  
+  // Vycentrujeme target oblast v DALL-E canvasu
+  const targetOffsetX = (dalleSize - params.targetWidth * scale) / 2
+  const targetOffsetY = (dalleSize - params.targetHeight * scale) / 2
+  
   try {
-    // Vytvoř canvas pro přípravu obrázku a masky
+    // Vytvoř canvas pro přípravu obrázku
     const img = await loadImageFromDataUrl(params.image)
     
     const srcRatio = img.width / img.height
     const tgtRatio = params.targetWidth / params.targetHeight
     
-    // Určíme kam umístit zdrojový obrázek a kde je potřeba dogenerovat
+    // Určíme kam umístit zdrojový obrázek
     let drawX = 0
     let drawY = 0
     let drawWidth = params.targetWidth
@@ -602,53 +610,36 @@ export async function outpaintImage(
       drawX = (params.targetWidth - drawWidth) / 2
     }
     
-    // DALL-E 2 podporuje jen 1024x1024, 512x512, 256x256
-    const dalleSize = 1024
-    const scale = dalleSize / Math.max(params.targetWidth, params.targetHeight)
+    // Pozice zdrojového obrázku ve scaled prostoru
+    const scaledDrawX = targetOffsetX + drawX * scale
+    const scaledDrawY = targetOffsetY + drawY * scale
+    const scaledDrawWidth = drawWidth * scale
+    const scaledDrawHeight = drawHeight * scale
     
-    // Vytvoř scaled canvas pro DALL-E
+    // Vytvoř RGBA canvas pro DALL-E (průhledné oblasti = dogenerovat)
     const canvas = document.createElement('canvas')
     canvas.width = dalleSize
     canvas.height = dalleSize
     const ctx = canvas.getContext('2d')!
     
-    // Vyplň průhledností (DALL-E dogeneruje průhledné oblasti)
+    // Celý canvas průhledný
     ctx.clearRect(0, 0, dalleSize, dalleSize)
     
-    // Nakresli zdrojový obrázek do středu
-    const scaledDrawX = drawX * scale + (dalleSize - params.targetWidth * scale) / 2
-    const scaledDrawY = drawY * scale + (dalleSize - params.targetHeight * scale) / 2
-    const scaledDrawWidth = drawWidth * scale
-    const scaledDrawHeight = drawHeight * scale
-    
+    // Nakresli zdrojový obrázek - tato oblast zůstane, zbytek je průhledný
     ctx.drawImage(img, scaledDrawX, scaledDrawY, scaledDrawWidth, scaledDrawHeight)
     
-    // Vytvoř masku - bílá = dogenerovat, černá = zachovat
-    const maskCanvas = document.createElement('canvas')
-    maskCanvas.width = dalleSize
-    maskCanvas.height = dalleSize
-    const maskCtx = maskCanvas.getContext('2d')!
-    
-    // Vyplň bílou (dogenerovat vše)
-    maskCtx.fillStyle = '#ffffff'
-    maskCtx.fillRect(0, 0, dalleSize, dalleSize)
-    
-    // Černá oblast kde je obrázek (zachovat)
-    maskCtx.fillStyle = '#000000'
-    maskCtx.fillRect(scaledDrawX, scaledDrawY, scaledDrawWidth, scaledDrawHeight)
-    
-    // Konvertuj na PNG blob
+    // Konvertuj na PNG blob (zachová průhlednost)
     const imageBlob = await canvasToBlob(canvas, 'image/png')
-    const maskBlob = await canvasToBlob(maskCanvas, 'image/png')
     
-    // Zavolej DALL-E 2 edit API
+    // DALL-E 2 edit API: průhledné oblasti v obrázku = dogenerovat
+    // Mask není potřeba pokud obrázek má průhlednost
     const formData = new FormData()
     formData.append('image', imageBlob, 'image.png')
-    formData.append('mask', maskBlob, 'mask.png')
-    formData.append('prompt', params.prompt || 'Continue the background seamlessly, matching the style and colors')
+    formData.append('prompt', params.prompt || 'Continue the background seamlessly, matching the style, colors and lighting of the existing image')
     formData.append('model', 'dall-e-2')
     formData.append('n', '1')
     formData.append('size', '1024x1024')
+    formData.append('response_format', 'b64_json')
     
     const response = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
@@ -681,14 +672,12 @@ export async function outpaintImage(
     const finalCtx = finalCanvas.getContext('2d')!
     
     // Crop jen požadovanou oblast z DALL-E výstupu
-    const cropX = (dalleSize - params.targetWidth * scale) / 2
-    const cropY = (dalleSize - params.targetHeight * scale) / 2
     const cropWidth = params.targetWidth * scale
     const cropHeight = params.targetHeight * scale
     
     finalCtx.drawImage(
       resultImg, 
-      cropX, cropY, cropWidth, cropHeight,
+      targetOffsetX, targetOffsetY, cropWidth, cropHeight,
       0, 0, params.targetWidth, params.targetHeight
     )
     
@@ -704,6 +693,7 @@ export async function outpaintImage(
 
 /**
  * Fallback - použije rozmazané pozadí místo AI outpaintingu
+ * Vytvoří plynulé rozmazané pozadí které vyplní prázdné místo
  */
 async function blurFillFallback(params: OutpaintingParams): Promise<OutpaintingResult> {
   try {
@@ -717,16 +707,7 @@ async function blurFillFallback(params: OutpaintingParams): Promise<OutpaintingR
     const srcRatio = img.width / img.height
     const tgtRatio = params.targetWidth / params.targetHeight
     
-    // Nejdřív nakresli rozmazané pozadí (celý obrázek roztažený)
-    ctx.filter = 'blur(30px)'
-    ctx.drawImage(img, -20, -20, params.targetWidth + 40, params.targetHeight + 40)
-    ctx.filter = 'none'
-    
-    // Přidej tmavší overlay pro lepší kontrast
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'
-    ctx.fillRect(0, 0, params.targetWidth, params.targetHeight)
-    
-    // Pak nakresli ostrý obrázek do středu
+    // Vypočítej kam nakreslit ostrý obrázek
     let drawX = 0
     let drawY = 0
     let drawWidth = params.targetWidth
@@ -742,7 +723,29 @@ async function blurFillFallback(params: OutpaintingParams): Promise<OutpaintingR
       drawX = (params.targetWidth - drawWidth) / 2
     }
     
+    // 1. Nakresli silně rozmazané pozadí (celý obrázek roztažený přes celý canvas)
+    ctx.filter = 'blur(40px) saturate(1.1)'
+    ctx.drawImage(img, -50, -50, params.targetWidth + 100, params.targetHeight + 100)
+    ctx.filter = 'none'
+    
+    // 2. Přidej jemný gradient overlay pro lepší splynutí
+    const gradient = ctx.createRadialGradient(
+      params.targetWidth / 2, params.targetHeight / 2, Math.min(drawWidth, drawHeight) / 3,
+      params.targetWidth / 2, params.targetHeight / 2, Math.max(params.targetWidth, params.targetHeight) / 1.5
+    )
+    gradient.addColorStop(0, 'rgba(0,0,0,0)')
+    gradient.addColorStop(1, 'rgba(0,0,0,0.15)')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, params.targetWidth, params.targetHeight)
+    
+    // 3. Nakresli ostrý obrázek do středu s jemným stínem pro hloubku
+    ctx.shadowColor = 'rgba(0,0,0,0.3)'
+    ctx.shadowBlur = 20
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = 0
     ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
+    ctx.shadowColor = 'transparent'
+    ctx.shadowBlur = 0
     
     return {
       success: true,

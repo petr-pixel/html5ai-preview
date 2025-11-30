@@ -467,6 +467,12 @@ export interface AppState {
   setPerFormatTextSettings: (formatKey: string, settings: Partial<PerFormatTextSettings>) => void
   resetPerFormatTextSettings: () => void
   
+  // Outpainted images per format
+  outpaintedImages: Record<string, string>
+  setOutpaintedImage: (formatKey: string, imageUrl: string) => void
+  clearOutpaintedImage: (formatKey: string) => void
+  clearAllOutpaintedImages: () => void
+  
   // Watermark
   watermark: Watermark
   setWatermark: (watermark: Partial<Watermark>) => void
