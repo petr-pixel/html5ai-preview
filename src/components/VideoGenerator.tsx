@@ -1,25 +1,24 @@
 /**
  * VideoGenerator - Komponenta pro generování videí
  * 
- * Podporuje 3 tiery:
- * - Tier 1: Slideshow (zdarma, klientské)
- * - Tier 2: Motion AI (Replicate)
- * - Tier 3: Generative AI (Sora/Runway)
+ * Kompletní flow:
+ * 1. Vybrat kreativy (bannery) pro slideshow
+ * 2. Nastavit pořadí a délku
+ * 3. Nahrát hudbu (volitelné)
+ * 4. Vygenerovat video
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { Button, Card, Badge, Progress } from '@/components/ui'
 import { 
   createSlideshowFromCreatives, 
   calculateVideoCost,
-  createVideoThumbnail,
   type VideoTier,
   type VideoResult 
 } from '@/lib/video-engine'
 import { 
   Video, 
-  Sparkles, 
   Download, 
   Loader2,
   Film,
@@ -27,8 +26,18 @@ import {
   Brain,
   DollarSign,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Music,
+  Upload,
+  X,
+  GripVertical,
+  Plus,
+  Trash2,
+  Play,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react'
+import type { Creative } from '@/types'
 
 const TIERS = [
   {
@@ -38,7 +47,7 @@ const TIERS = [
     icon: Film,
     badge: 'Zdarma',
     badgeColor: 'bg-green-100 text-green-700',
-    features: ['Bez API klíče', 'Okamžité', 'Ken Burns', 'Fade transitions'],
+    features: ['Bez API klíče', 'Okamžité'],
   },
   {
     id: 'motion' as VideoTier,
@@ -46,8 +55,8 @@ const TIERS = [
     description: 'Oživení obrázku pomocí AI',
     icon: Wand2,
     badge: '~$0.05/s',
-    badgeColor: 'bg-blue-100 text-blue-700',
-    features: ['Stable Video Diffusion', 'Animate Diff', 'Subtilní pohyb'],
+    badgeColor: 'bg-purple-100 text-purple-700',
+    features: ['Stable Video Diffusion', 'Animate Diff'],
     requiresApi: 'replicate',
   },
   {
@@ -56,20 +65,20 @@ const TIERS = [
     description: 'Text-to-video pomocí Sora',
     icon: Brain,
     badge: '$0.10-0.40/s',
-    badgeColor: 'bg-purple-100 text-purple-700',
-    features: ['Sora 2', 'Sora 2 Pro', 'Plná kreativní kontrola'],
+    badgeColor: 'bg-orange-100 text-orange-700',
+    features: ['Sora 2', 'Sora 2 Pro'],
     requiresApi: 'openai',
   },
 ]
 
+interface SlideItem {
+  id: string
+  creative: Creative
+  duration: number // seconds
+}
+
 export function VideoGenerator() {
-  const { 
-    creatives, 
-    videoScenario, 
-    apiKeys, 
-    brandKits, 
-    activeBrandKit 
-  } = useAppStore()
+  const { creatives, videoScenario, setVideoScenario, apiKeys } = useAppStore()
   
   const [selectedTier, setSelectedTier] = useState<VideoTier>('slideshow')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -77,82 +86,137 @@ export function VideoGenerator() {
   const [progressMessage, setProgressMessage] = useState('')
   const [result, setResult] = useState<VideoResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  const creativesArray = useMemo(() => Object.values(creatives), [creatives])
-  const activeBrandKitData = brandKits.find(k => k.id === activeBrandKit)
+  
+  // Slideshow specific state
+  const [slides, setSlides] = useState<SlideItem[]>([])
+  const [audioFile, setAudioFile] = useState<File | null>(null)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  
+  const audioInputRef = useRef<HTMLInputElement>(null)
+  const creativesArray = useMemo(() => Object.values(creatives) as Creative[], [creatives])
 
   const estimatedCost = useMemo(() => {
     return calculateVideoCost(selectedTier, videoScenario.lengthSeconds)
   }, [selectedTier, videoScenario.lengthSeconds])
 
-  const canGenerate = useMemo(() => {
-    if (selectedTier === 'slideshow') {
-      return creativesArray.length >= 2
-    }
-    if (selectedTier === 'motion') {
-      return creativesArray.length >= 1 // Potřebuje alespoň 1 obrázek + API klíč
-    }
-    if (selectedTier === 'generative') {
-      return apiKeys.openai && videoScenario.hook // Potřebuje API klíč + scénář
-    }
-    return false
-  }, [selectedTier, creativesArray.length, apiKeys.openai, videoScenario.hook])
+  const totalDuration = useMemo(() => {
+    return slides.reduce((sum, s) => sum + s.duration, 0)
+  }, [slides])
 
+  // Add creative to slides
+  const addSlide = (creative: Creative) => {
+    if (slides.find(s => s.creative.id === creative.id)) return
+    setSlides([...slides, { 
+      id: `slide-${Date.now()}`, 
+      creative, 
+      duration: 3 // default 3 seconds
+    }])
+  }
+
+  // Remove slide
+  const removeSlide = (id: string) => {
+    setSlides(slides.filter(s => s.id !== id))
+  }
+
+  // Move slide up/down
+  const moveSlide = (index: number, direction: 'up' | 'down') => {
+    const newSlides = [...slides]
+    const newIndex = direction === 'up' ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= slides.length) return
+    ;[newSlides[index], newSlides[newIndex]] = [newSlides[newIndex], newSlides[index]]
+    setSlides(newSlides)
+  }
+
+  // Update slide duration
+  const updateSlideDuration = (id: string, duration: number) => {
+    setSlides(slides.map(s => s.id === id ? { ...s, duration } : s))
+  }
+
+  // Handle audio upload
+  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    if (!file.type.startsWith('audio/')) {
+      alert('Prosím vyberte audio soubor (MP3, WAV, etc.)')
+      return
+    }
+    
+    setAudioFile(file)
+    setAudioUrl(URL.createObjectURL(file))
+  }
+
+  // Remove audio
+  const removeAudio = () => {
+    if (audioUrl) URL.revokeObjectURL(audioUrl)
+    setAudioFile(null)
+    setAudioUrl(null)
+  }
+
+  // Generate video
   const handleGenerate = async () => {
+    if (slides.length < 2) {
+      setError('Přidejte alespoň 2 kreativy do slideshow')
+      return
+    }
+
     setIsGenerating(true)
     setProgress(0)
     setError(null)
     setResult(null)
 
     try {
-      if (selectedTier === 'slideshow') {
-        const videoResult = await createSlideshowFromCreatives(
-          creativesArray,
-          videoScenario,
-          activeBrandKitData,
-          undefined, // audioUrl - zatím nepodporujeme
-          (p: number, msg: string) => {
-            setProgress(p)
-            setProgressMessage(msg)
-          }
-        )
-        
-        // Vytvoř thumbnail
-        const thumbnail = await createVideoThumbnail(videoResult.videoUrl)
-        videoResult.thumbnailUrl = thumbnail
-        
-        setResult(videoResult)
-      } else if (selectedTier === 'motion') {
-        throw new Error('Motion AI vyžaduje Replicate API klíč. Přejděte do Settings a nastavte ho.')
-      } else if (selectedTier === 'generative') {
-        // Pro generative AI přesměruj na VideoScenarioEditor
-        throw new Error('Pro generativní video použijte sekci "Video reklama" s kompletním scénářem.')
+      // Prepare creatives in slide order
+      const orderedCreatives = slides.map(s => s.creative)
+      
+      // Update video scenario with total duration
+      const scenario = {
+        ...videoScenario,
+        lengthSeconds: totalDuration,
       }
+
+      const videoResult = await createSlideshowFromCreatives(
+        orderedCreatives,
+        scenario,
+        undefined, // brandKit
+        audioUrl || undefined,
+        (p: number, msg: string) => {
+          setProgress(p)
+          setProgressMessage(msg)
+        }
+      )
+      
+      setResult(videoResult)
     } catch (err) {
+      console.error('Video generation error:', err)
       setError(err instanceof Error ? err.message : 'Nastala chyba při generování videa')
     } finally {
       setIsGenerating(false)
     }
   }
 
+  // Download video
   const handleDownload = () => {
     if (!result) return
     
     const a = document.createElement('a')
     a.href = result.videoUrl
-    a.download = `video-${videoScenario.aspectRatio}-${result.duration}s.webm`
+    a.download = `slideshow-${videoScenario.aspectRatio.replace(':', 'x')}-${totalDuration}s.webm`
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
   }
 
   return (
-    <Card className="p-6">
+    <div className="p-6 max-w-6xl mx-auto">
+      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
           <Video className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold">Video Generator</h2>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-semibold text-gray-900">Video Generator</h1>
+          <p className="text-sm text-gray-500">
             Vytvořte video z vašich kreativ
           </p>
         </div>
@@ -164,32 +228,34 @@ export function VideoGenerator() {
           const Icon = tier.icon
           const isSelected = selectedTier === tier.id
           const isAvailable = tier.id === 'slideshow' || 
-            (tier.requiresApi === 'replicate') ||
             (tier.requiresApi === 'openai' && apiKeys.openai)
           
           return (
             <button
               key={tier.id}
-              onClick={() => setSelectedTier(tier.id)}
-              disabled={!isAvailable && tier.id !== 'slideshow'}
+              onClick={() => isAvailable && setSelectedTier(tier.id)}
               className={`p-4 rounded-xl border-2 text-left transition-all ${
                 isSelected
-                  ? 'border-purple-500 bg-purple-50'
-                  : 'border-border hover:border-purple-300'
-              } ${!isAvailable && tier.id !== 'slideshow' ? 'opacity-50' : ''}`}
+                  ? 'border-[#1a73e8] bg-blue-50'
+                  : isAvailable 
+                    ? 'border-gray-200 hover:border-gray-300 bg-white'
+                    : 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+              }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <Icon className={`w-5 h-5 ${isSelected ? 'text-purple-600' : 'text-muted-foreground'}`} />
-                <Badge className={tier.badgeColor}>{tier.badge}</Badge>
+                <Icon className={`w-5 h-5 ${isSelected ? 'text-[#1a73e8]' : 'text-gray-400'}`} />
+                <span className={`text-xs px-2 py-0.5 rounded-full ${tier.badgeColor}`}>
+                  {tier.badge}
+                </span>
               </div>
-              <h3 className="font-medium">{tier.name}</h3>
-              <p className="text-xs text-muted-foreground mt-1">{tier.description}</p>
+              <h3 className="font-medium text-gray-900">{tier.name}</h3>
+              <p className="text-xs text-gray-500 mt-1">{tier.description}</p>
               <div className="flex flex-wrap gap-1 mt-2">
-                {tier.features.slice(0, 2).map(f => (
-                  <span key={f} className="text-xs bg-muted px-1.5 py-0.5 rounded">{f}</span>
+                {tier.features.map(f => (
+                  <span key={f} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{f}</span>
                 ))}
               </div>
-              {tier.requiresApi && !apiKeys.openai && tier.requiresApi === 'openai' && (
+              {tier.requiresApi && !apiKeys.openai && (
                 <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
                   <AlertTriangle className="w-3 h-3" />
                   Vyžaduje API klíč
@@ -200,43 +266,229 @@ export function VideoGenerator() {
         })}
       </div>
 
-      {/* Info panel */}
-      <div className="bg-muted/50 rounded-lg p-4 mb-6">
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <DollarSign className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
-            <p className="text-sm font-medium">
-              {estimatedCost === 0 ? 'Zdarma' : `~$${estimatedCost.toFixed(2)}`}
-            </p>
-            <p className="text-xs text-muted-foreground">Cena</p>
+      {/* Main Content - Two Column Layout */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Left: Creative Selection */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h2 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+            <Film className="w-4 h-4 text-gray-400" />
+            Dostupné kreativy
+          </h2>
+          
+          {creativesArray.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-sm">Žádné kreativy k dispozici</p>
+              <p className="text-xs mt-1">Nejprve vygenerujte bannery v editoru</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2 max-h-[400px] overflow-y-auto">
+              {creativesArray.map(creative => {
+                const isAdded = slides.some(s => s.creative.id === creative.id)
+                return (
+                  <button
+                    key={creative.id}
+                    onClick={() => !isAdded && addSlide(creative)}
+                    disabled={isAdded}
+                    className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
+                      isAdded 
+                        ? 'border-green-500 opacity-50' 
+                        : 'border-transparent hover:border-[#1a73e8]'
+                    }`}
+                  >
+                    <img 
+                      src={creative.imageUrl} 
+                      alt={creative.format.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {isAdded && (
+                      <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
+                        <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">Přidáno</span>
+                      </div>
+                    )}
+                    {!isAdded && (
+                      <div className="absolute inset-0 bg-black/0 hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+                        <Plus className="w-6 h-6 text-white" />
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Right: Timeline & Settings */}
+        <div className="space-y-4">
+          {/* Timeline */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Play className="w-4 h-4 text-gray-400" />
+                Timeline
+              </span>
+              <span className="text-sm text-gray-500">{totalDuration}s celkem</span>
+            </h2>
+
+            {slides.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+                <p className="text-sm">Přidejte kreativy kliknutím vlevo</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                {slides.map((slide, index) => (
+                  <div 
+                    key={slide.id}
+                    className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg"
+                  >
+                    <GripVertical className="w-4 h-4 text-gray-300" />
+                    
+                    {/* Thumbnail */}
+                    <div className="w-16 h-10 rounded overflow-hidden flex-shrink-0">
+                      <img 
+                        src={slide.creative.imageUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-700 truncate">
+                        {slide.creative.format.name}
+                      </p>
+                      <p className="text-[10px] text-gray-400">
+                        {slide.creative.format.width}×{slide.creative.format.height}
+                      </p>
+                    </div>
+                    
+                    {/* Duration */}
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={slide.duration}
+                        onChange={(e) => updateSlideDuration(slide.id, parseInt(e.target.value) || 3)}
+                        className="w-12 text-center text-sm border border-gray-200 rounded px-1 py-0.5"
+                      />
+                      <span className="text-xs text-gray-400">s</span>
+                    </div>
+                    
+                    {/* Actions */}
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => moveSlide(index, 'up')}
+                        disabled={index === 0}
+                        className="p-1 hover:bg-gray-200 rounded disabled:opacity-30"
+                      >
+                        <ChevronUp className="w-3 h-3" />
+                      </button>
+                      <button 
+                        onClick={() => moveSlide(index, 'down')}
+                        disabled={index === slides.length - 1}
+                        className="p-1 hover:bg-gray-200 rounded disabled:opacity-30"
+                      >
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                      <button 
+                        onClick={() => removeSlide(slide.id)}
+                        className="p-1 hover:bg-red-100 rounded text-red-500"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div>
-            <Clock className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
-            <p className="text-sm font-medium">{videoScenario.lengthSeconds}s</p>
-            <p className="text-xs text-muted-foreground">Délka</p>
+
+          {/* Audio */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <Music className="w-4 h-4 text-gray-400" />
+              Hudba (volitelné)
+            </h2>
+
+            {audioFile ? (
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <Music className="w-5 h-5 text-purple-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-700 truncate">{audioFile.name}</p>
+                  <p className="text-xs text-gray-400">{(audioFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                </div>
+                <button onClick={removeAudio} className="p-1 hover:bg-red-100 rounded text-red-500">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => audioInputRef.current?.click()}
+                className="w-full py-4 border-2 border-dashed border-gray-200 rounded-lg text-gray-400 hover:border-[#1a73e8] hover:text-[#1a73e8] transition-colors"
+              >
+                <Upload className="w-5 h-5 mx-auto mb-1" />
+                <span className="text-sm">Nahrát MP3/WAV</span>
+              </button>
+            )}
+            <input
+              ref={audioInputRef}
+              type="file"
+              accept="audio/*"
+              onChange={handleAudioUpload}
+              className="hidden"
+            />
           </div>
-          <div>
-            <Film className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
-            <p className="text-sm font-medium">{creativesArray.length}</p>
-            <p className="text-xs text-muted-foreground">Kreativ</p>
+
+          {/* Aspect Ratio */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="font-medium text-gray-900 mb-3">Poměr stran</h2>
+            <div className="flex gap-2">
+              {['16:9', '1:1', '9:16'].map(ratio => (
+                <button
+                  key={ratio}
+                  onClick={() => setVideoScenario({ aspectRatio: ratio as any })}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                    videoScenario.aspectRatio === ratio
+                      ? 'bg-[#1a73e8] text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {ratio}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Requirements */}
-      {selectedTier === 'slideshow' && creativesArray.length < 2 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-          <p className="text-sm text-amber-800">
-            Pro slideshow potřebujete alespoň 2 kreativy. Aktuálně máte {creativesArray.length}.
-          </p>
+      {/* Stats Bar */}
+      <div className="mt-6 bg-gray-50 rounded-xl p-4">
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div>
+            <DollarSign className="w-4 h-4 mx-auto text-gray-400 mb-1" />
+            <p className="text-lg font-semibold text-gray-900">
+              {estimatedCost === 0 ? 'Zdarma' : `~$${estimatedCost.toFixed(2)}`}
+            </p>
+            <p className="text-xs text-gray-500">Cena</p>
+          </div>
+          <div>
+            <Clock className="w-4 h-4 mx-auto text-gray-400 mb-1" />
+            <p className="text-lg font-semibold text-gray-900">{totalDuration}s</p>
+            <p className="text-xs text-gray-500">Délka</p>
+          </div>
+          <div>
+            <Film className="w-4 h-4 mx-auto text-gray-400 mb-1" />
+            <p className="text-lg font-semibold text-gray-900">{slides.length}</p>
+            <p className="text-xs text-gray-500">Snímků</p>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Progress */}
       {isGenerating && (
-        <div className="mb-6">
+        <div className="mt-4 bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">{progressMessage}</span>
+            <span className="text-sm text-gray-600">{progressMessage || 'Generuji video...'}</span>
             <span className="text-sm font-medium">{Math.round(progress)}%</span>
           </div>
           <Progress value={progress} />
@@ -245,66 +497,55 @@ export function VideoGenerator() {
 
       {/* Error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+        <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
           <p className="text-sm text-red-800">{error}</p>
         </div>
       )}
 
       {/* Result */}
       {result && (
-        <div className="mb-6">
+        <div className="mt-4 bg-white rounded-xl border border-gray-200 p-4">
+          <h3 className="font-medium text-gray-900 mb-3">Výsledné video</h3>
           <div className="aspect-video bg-black rounded-lg overflow-hidden mb-4">
             <video
               src={result.videoUrl}
-              poster={result.thumbnailUrl}
               controls
               className="w-full h-full"
             />
           </div>
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              {result.duration}s • {result.tier} • {result.cost === 0 ? 'Zdarma' : `$${result.cost?.toFixed(2)}`}
-            </div>
-            <Button onClick={handleDownload}>
-              <Download className="w-4 h-4" />
-              Stáhnout
-            </Button>
-          </div>
+          <Button onClick={handleDownload} className="w-full bg-[#1a73e8] hover:bg-blue-700 text-white">
+            <Download className="w-4 h-4 mr-2" />
+            Stáhnout video ({result.duration}s)
+          </Button>
         </div>
       )}
 
       {/* Generate Button */}
-      <Button
-        size="lg"
-        className="w-full"
-        onClick={handleGenerate}
-        disabled={isGenerating || !canGenerate}
-      >
-        {isGenerating ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Generuji...
-          </>
-        ) : (
-          <>
-            <Sparkles className="w-4 h-4" />
-            Vygenerovat video
-          </>
-        )}
-      </Button>
-
-      {/* Tier-specific notes */}
-      <div className="mt-4 text-xs text-muted-foreground">
+      <div className="mt-6">
+        <Button
+          onClick={handleGenerate}
+          disabled={isGenerating || slides.length < 2}
+          className="w-full py-4 text-lg bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Generuji video...
+            </>
+          ) : (
+            <>
+              <Wand2 className="w-5 h-5 mr-2" />
+              Vygenerovat video
+            </>
+          )}
+        </Button>
+        
         {selectedTier === 'slideshow' && (
-          <p>💡 Slideshow vytvoří video s Ken Burns efektem a plynulými přechody mezi vašimi kreativami.</p>
-        )}
-        {selectedTier === 'motion' && (
-          <p>💡 Motion AI oživí statický obrázek pomocí AI. Ideální pro jemné animace produktů.</p>
-        )}
-        {selectedTier === 'generative' && (
-          <p>💡 Pro plnohodnotné generativní video použijte sekci "Video reklama" s kompletním scénářem.</p>
+          <p className="text-xs text-center text-gray-400 mt-2">
+            💡 Motion AI oživí statický obrázek pomocí AI. Ideální pro jemné animace produktů.
+          </p>
         )}
       </div>
-    </Card>
+    </div>
   )
 }

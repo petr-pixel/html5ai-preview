@@ -10,7 +10,7 @@
 import React, { useState, useRef } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { platforms, getFormatKey, getCategoryType, isBrandingCategory, isVideoCategory, getMaxSizeKB } from '@/lib/platforms'
-import { generateId, cn, loadImage } from '@/lib/utils'
+import { generateId, cn, loadImage, drawRoundedRect } from '@/lib/utils'
 import { Sidebar, NavigationView } from '@/components/Sidebar'
 import { SettingsModal } from '@/components/SettingsModal'
 import { FormatCard } from '@/components/FormatCard'
@@ -37,6 +37,120 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import type { Creative, TextOverlay, PlatformId, CategoryType } from '@/types'
+
+// ============================================================================
+// ENHANCED PROMPT BUILDER - Pro moderní 2025 AI kvalitu
+// ============================================================================
+
+function buildEnhancedPrompt(userPrompt: string, format: 'landscape' | 'square' | 'portrait'): string {
+  // Detekce typu obsahu z promptu
+  const isProduct = /produkt|product|zboží|goods|item/i.test(userPrompt)
+  const isLifestyle = /lifestyle|život|living|people|lidé|osoba/i.test(userPrompt)
+  const isFood = /jídlo|food|restaur|café|kafe|drink|pití/i.test(userPrompt)
+  const isTech = /tech|software|app|digital|mobil|phone|computer/i.test(userPrompt)
+  const isNature = /příroda|nature|outdoor|hory|mountain|moře|sea|les|forest/i.test(userPrompt)
+  const isFashion = /móda|fashion|oblečení|clothes|style|styl/i.test(userPrompt)
+  
+  // Základní profesionální parametry
+  const baseStyle = [
+    "ultra high quality",
+    "photorealistic",
+    "8K resolution", 
+    "sharp focus",
+    "professional color grading",
+    "cinematic lighting",
+  ]
+  
+  // Kompozice podle formátu
+  const compositionByFormat = {
+    landscape: "wide cinematic composition, rule of thirds, negative space on sides for text",
+    square: "balanced centered composition, symmetrical framing, clear focal point",
+    portrait: "vertical dynamic composition, subject positioned for text overlay at top or bottom",
+  }
+  
+  // Styl podle typu obsahu
+  let contentStyle: string[] = []
+  
+  if (isProduct) {
+    contentStyle = [
+      "commercial product photography",
+      "studio lighting setup",
+      "clean gradient background",
+      "subtle reflections",
+      "hero shot angle",
+    ]
+  } else if (isFood) {
+    contentStyle = [
+      "professional food photography",
+      "appetizing presentation",
+      "natural daylight feel",
+      "shallow depth of field",
+      "fresh ingredients visible",
+    ]
+  } else if (isTech) {
+    contentStyle = [
+      "modern tech aesthetic",
+      "clean minimal design",
+      "cool blue and white tones",
+      "sleek surfaces",
+      "futuristic atmosphere",
+    ]
+  } else if (isFashion) {
+    contentStyle = [
+      "high-end fashion photography",
+      "editorial style",
+      "dramatic lighting",
+      "sophisticated color palette",
+      "aspirational mood",
+    ]
+  } else if (isNature) {
+    contentStyle = [
+      "landscape photography",
+      "golden hour lighting",
+      "vivid natural colors",
+      "breathtaking scenery",
+      "sense of adventure",
+    ]
+  } else if (isLifestyle) {
+    contentStyle = [
+      "authentic lifestyle photography",
+      "natural candid moment",
+      "warm inviting atmosphere",
+      "genuine emotion",
+      "relatable scene",
+    ]
+  } else {
+    // Default professional style
+    contentStyle = [
+      "premium advertising photography",
+      "modern aesthetic",
+      "sophisticated lighting",
+      "professional art direction",
+      "brand-quality imagery",
+    ]
+  }
+  
+  // Anti-AI artifacts
+  const antiArtifacts = [
+    "no watermarks",
+    "no text in image",
+    "no logos",
+    "anatomically correct",
+    "natural proportions",
+  ]
+  
+  // Sestavení finálního promptu
+  const promptParts = [
+    userPrompt,
+    ...baseStyle,
+    compositionByFormat[format],
+    ...contentStyle,
+    ...antiArtifacts,
+    "trending on Behance and Dribbble 2025",
+  ]
+  
+  return promptParts.join(", ")
+}
 
 // ============================================================================
 // MAIN APP
@@ -120,11 +234,15 @@ export default function App() {
     setProgress(10)
 
     try {
-      const size = sourceFormat === 'landscape' ? '1536x1024' 
-                 : sourceFormat === 'portrait' ? '1024x1536' 
+      // DALL-E 3 supported sizes: 1024x1024, 1792x1024 (landscape), 1024x1792 (portrait)
+      const size = sourceFormat === 'landscape' ? '1792x1024' 
+                 : sourceFormat === 'portrait' ? '1024x1792' 
                  : '1024x1024'
 
       const quality = imageModelTier === 'best' ? 'hd' : 'standard'
+
+      // Build professional prompt for modern AI imagery
+      const enhancedPrompt = buildEnhancedPrompt(prompt, sourceFormat)
 
       const res = await fetch('https://api.openai.com/v1/images/generations', {
         method: 'POST',
@@ -134,9 +252,9 @@ export default function App() {
         },
         body: JSON.stringify({
           model: 'dall-e-3',
-          prompt: `Professional advertising image. ${prompt}. Clean composition, high contrast, room for text overlay.`,
-          size: '1024x1024',
-          quality: imageModelTier === 'best' ? 'hd' : 'standard',
+          prompt: enhancedPrompt,
+          size: size,
+          quality: quality,
           n: 1,
           response_format: 'b64_json',
         }),
@@ -265,6 +383,10 @@ export default function App() {
         canvas.width = fmt.width
         canvas.height = fmt.height
         const ctx = canvas.getContext('2d')!
+        
+        // High quality rendering
+        ctx.imageSmoothingEnabled = true
+        ctx.imageSmoothingQuality = 'high'
 
         // Smart crop nebo základní crop
         let cropResult = { x: 0, y: 0, width: img.width, height: img.height }
@@ -328,7 +450,8 @@ export default function App() {
           }
         }
 
-        const imageUrl = canvas.toDataURL('image/jpeg', 0.92)
+        // Export as high quality PNG for preview, JPEG compression happens during export
+        const imageUrl = canvas.toDataURL('image/png')
 
         newCreatives.push({
           id: generateId(),
@@ -833,46 +956,9 @@ function drawTextOverlay(
   if (!overlay.headline && !overlay.subheadline && !overlay.cta) return
 
   const padding = Math.min(width, height) * 0.05
-  const fontFamily = brandKit?.headlineFont || 'system-ui, -apple-system, sans-serif'
+  const fontFamily = brandKit?.headlineFont || 'Arial, Helvetica, sans-serif'
   const textColor = brandKit?.textColor || '#ffffff'
   const ctaColor = overlay.ctaColor || brandKit?.ctaColor || '#1a73e8'
-
-  // Calculate position
-  let x = padding
-  let y = padding
-  let align: CanvasTextAlign = 'left'
-
-  switch (overlay.position) {
-    case 'top-center':
-      x = width / 2
-      align = 'center'
-      break
-    case 'top-right':
-      x = width - padding
-      align = 'right'
-      break
-    case 'center':
-      x = width / 2
-      y = height / 2 - 40
-      align = 'center'
-      break
-    case 'bottom-left':
-      y = height - padding - 80
-      break
-    case 'bottom-center':
-      x = width / 2
-      y = height - padding - 80
-      align = 'center'
-      break
-    case 'bottom-right':
-      x = width - padding
-      y = height - padding - 80
-      align = 'right'
-      break
-  }
-
-  ctx.textAlign = align
-  ctx.textBaseline = 'top'
 
   // Font sizes based on overlay.fontSize
   const baseSize = Math.min(width, height)
@@ -881,61 +967,131 @@ function drawTextOverlay(
     medium: { headline: baseSize * 0.08, sub: baseSize * 0.05, cta: baseSize * 0.04 },
     large: { headline: baseSize * 0.1, sub: baseSize * 0.06, cta: baseSize * 0.05 },
   }
-  const size = sizes[overlay.fontSize]
+  const size = sizes[overlay.fontSize] || sizes.medium
 
+  // Calculate total text block height
+  let blockHeight = 0
+  if (overlay.headline) blockHeight += size.headline * 1.3
+  if (overlay.subheadline) blockHeight += size.sub * 1.5
+  if (overlay.cta) blockHeight += size.cta * 2.5
+
+  // Calculate starting position
+  let x = padding
+  let y = padding
+  let align: CanvasTextAlign = 'left'
+
+  switch (overlay.position) {
+    case 'top-left':
+      x = padding
+      y = padding
+      align = 'left'
+      break
+    case 'top-center':
+      x = width / 2
+      y = padding
+      align = 'center'
+      break
+    case 'top-right':
+      x = width - padding
+      y = padding
+      align = 'right'
+      break
+    case 'center':
+      x = width / 2
+      y = (height - blockHeight) / 2
+      align = 'center'
+      break
+    case 'bottom-left':
+      x = padding
+      y = height - padding - blockHeight
+      align = 'left'
+      break
+    case 'bottom-center':
+      x = width / 2
+      y = height - padding - blockHeight
+      align = 'center'
+      break
+    case 'bottom-right':
+      x = width - padding
+      y = height - padding - blockHeight
+      align = 'right'
+      break
+  }
+
+  ctx.textAlign = align
   let currentY = y
 
-  // Headline
+  // Draw headline
   if (overlay.headline) {
-    ctx.font = `bold ${size.headline}px ${fontFamily}`
+    ctx.font = `bold ${Math.round(size.headline)}px ${fontFamily}`
     ctx.fillStyle = textColor
-    ctx.shadowColor = 'rgba(0,0,0,0.5)'
-    ctx.shadowBlur = 8
+    
+    // Text shadow for readability
+    ctx.shadowColor = 'rgba(0,0,0,0.7)'
+    ctx.shadowBlur = 6
     ctx.shadowOffsetX = 2
     ctx.shadowOffsetY = 2
+    
+    ctx.textBaseline = 'top'
     ctx.fillText(overlay.headline, x, currentY)
     currentY += size.headline * 1.3
   }
 
-  // Subheadline
+  // Draw subheadline
   if (overlay.subheadline) {
-    ctx.font = `${size.sub}px ${fontFamily}`
+    ctx.font = `${Math.round(size.sub)}px ${fontFamily}`
     ctx.fillStyle = textColor
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'
+    ctx.shadowBlur = 4
+    ctx.textBaseline = 'top'
     ctx.fillText(overlay.subheadline, x, currentY)
     currentY += size.sub * 1.5
   }
 
-  // CTA Button
-  if (overlay.cta) {
-    ctx.shadowBlur = 0
-    ctx.shadowOffsetX = 0
-    ctx.shadowOffsetY = 0
-
-    const ctaWidth = ctx.measureText(overlay.cta).width + size.cta * 2
-    const ctaHeight = size.cta * 2
-
-    let ctaX = x
-    if (align === 'center') ctaX = x - ctaWidth / 2
-    else if (align === 'right') ctaX = x - ctaWidth
-
-    // Button background
-    ctx.fillStyle = ctaColor
-    ctx.beginPath()
-    const radius = ctaHeight / 2
-    ctx.roundRect(ctaX, currentY, ctaWidth, ctaHeight, radius)
-    ctx.fill()
-
-    // Button text
-    ctx.fillStyle = '#ffffff'
-    ctx.font = `bold ${size.cta}px ${fontFamily}`
-    ctx.textAlign = 'center'
-    ctx.fillText(overlay.cta, ctaX + ctaWidth / 2, currentY + (ctaHeight - size.cta) / 2)
-  }
-
-  // Reset
+  // Reset shadow before CTA
+  ctx.shadowColor = 'transparent'
   ctx.shadowBlur = 0
   ctx.shadowOffsetX = 0
   ctx.shadowOffsetY = 0
+
+  // Draw CTA Button
+  if (overlay.cta) {
+    // Measure CTA text
+    ctx.font = `bold ${Math.round(size.cta)}px ${fontFamily}`
+    const ctaTextWidth = ctx.measureText(overlay.cta).width
+    const ctaPaddingX = size.cta * 1.2
+    const ctaPaddingY = size.cta * 0.6
+    const ctaWidth = ctaTextWidth + ctaPaddingX * 2
+    const ctaHeight = size.cta + ctaPaddingY * 2
+    const ctaRadius = ctaHeight / 2
+
+    // Calculate CTA X position based on alignment
+    let ctaX = x
+    if (align === 'center') {
+      ctaX = x - ctaWidth / 2
+    } else if (align === 'right') {
+      ctaX = x - ctaWidth
+    }
+
+    // Draw button background
+    ctx.fillStyle = ctaColor
+    drawRoundedRect(ctx, ctaX, currentY, ctaWidth, ctaHeight, ctaRadius)
+    ctx.fill()
+
+    // Draw button text (centered in button)
+    ctx.fillStyle = '#ffffff'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(overlay.cta, ctaX + ctaWidth / 2, currentY + ctaHeight / 2)
+  }
+
+  // Reset context
+  ctx.shadowColor = 'transparent'
+  ctx.shadowBlur = 0
+  ctx.shadowOffsetX = 0
+  ctx.shadowOffsetY = 0
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
 }
 
 async function drawWatermark(

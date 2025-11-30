@@ -4,7 +4,7 @@
  */
 
 import type { Format, TextOverlay, Watermark, QRCode } from '@/types'
-import { loadImage } from './utils'
+import { loadImage, drawRoundedRect } from './utils'
 
 // ============================================================================
 // TYPY
@@ -330,8 +330,7 @@ function drawTextOverlay(
 
     // Button background
     ctx.fillStyle = textOverlay.ctaColor
-    ctx.beginPath()
-    ctx.roundRect(ctaX, currentY, ctaWidth, ctaHeight, 6)
+    drawRoundedRect(ctx, ctaX, currentY, ctaWidth, ctaHeight, 6)
     ctx.fill()
 
     // Button text

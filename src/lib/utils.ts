@@ -85,3 +85,39 @@ export const throttle = <T extends (...args: Parameters<T>) => ReturnType<T>>(
     }
   }
 }
+
+/**
+ * Vykreslí zaoblený obdélník - kompatibilní se staršími prohlížeči
+ * Nahrazuje ctx.roundRect() který není všude podporován
+ */
+export function drawRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number | { tl: number; tr: number; br: number; bl: number }
+): void {
+  const r = typeof radius === 'number' 
+    ? { tl: radius, tr: radius, br: radius, bl: radius }
+    : radius
+
+  // Omez radius na max polovinu menší strany
+  const maxR = Math.min(width / 2, height / 2)
+  r.tl = Math.min(r.tl, maxR)
+  r.tr = Math.min(r.tr, maxR)
+  r.br = Math.min(r.br, maxR)
+  r.bl = Math.min(r.bl, maxR)
+
+  ctx.beginPath()
+  ctx.moveTo(x + r.tl, y)
+  ctx.lineTo(x + width - r.tr, y)
+  ctx.arcTo(x + width, y, x + width, y + r.tr, r.tr)
+  ctx.lineTo(x + width, y + height - r.br)
+  ctx.arcTo(x + width, y + height, x + width - r.br, y + height, r.br)
+  ctx.lineTo(x + r.bl, y + height)
+  ctx.arcTo(x, y + height, x, y + height - r.bl, r.bl)
+  ctx.lineTo(x, y + r.tl)
+  ctx.arcTo(x, y, x + r.tl, y, r.tl)
+  ctx.closePath()
+}
