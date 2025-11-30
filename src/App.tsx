@@ -9,8 +9,9 @@
 
 import React, { useState, useRef } from 'react'
 import { useAppStore } from '@/stores/app-store'
-import { platforms, getFormatKey, getCategoryType, isBrandingCategory, isVideoCategory, getMaxSizeKB } from '@/lib/platforms'
+import { platforms, getFormatKey, getCategoryType, isBrandingCategory, isVideoCategory, getMaxSizeKB, parseFormatKey } from '@/lib/platforms'
 import { generateId, cn, loadImage, drawRoundedRect } from '@/lib/utils'
+import { isR2Configured, uploadCreativesToR2Batch } from '@/lib/r2-storage'
 import { Sidebar, NavigationView } from '@/components/Sidebar'
 import { SettingsModal } from '@/components/SettingsModal'
 import { FormatCard } from '@/components/FormatCard'
@@ -36,6 +37,7 @@ import {
   Wand2,
   LayoutGrid,
   ArrowRight,
+  Cloud,
 } from 'lucide-react'
 import type { Creative, TextOverlay, PlatformId, CategoryType } from '@/types'
 
@@ -119,11 +121,14 @@ export default function App() {
     textModelTier,
     brandKits,
     activeBrandKit,
+    cropMode,
+    r2Config,
     setPlatform,
     setCategory,
     setPrompt,
     setSourceFormat,
     setSourceImage,
+    setCropMode,
     toggleFormat,
     selectAllFormats,
     clearSelection,
@@ -323,8 +328,7 @@ export default function App() {
 
       for (let i = 0; i < formats.length; i++) {
         const formatKey = formats[i]
-        const [plat, cat, indexStr] = formatKey.split('-')
-        const index = parseInt(indexStr, 10)
+        const { platform: plat, category: cat, index } = parseFormatKey(formatKey)
         const fmt = platforms[plat]?.categories[cat]?.formats[index]
 
         if (!fmt) continue
@@ -346,13 +350,43 @@ export default function App() {
         
         // Pro branding typ NEPOUŽÍVAT smart crop
         const catType = getCategoryType(plat, cat)
-        if (catType === 'image') {
+        
+        // Vypočítej základní crop (center crop)
+        const srcRatio = img.width / img.height
+        const tgtRatio = fmt.width / fmt.height
+        
+        if (cropMode === 'fit') {
+          // FIT režim: zachovat celý obrázek, přidat padding pokud potřeba
+          // Obrázek se vejde celý do canvasu (letterbox/pillarbox efekt)
+          let drawWidth = fmt.width
+          let drawHeight = fmt.height
+          let drawX = 0
+          let drawY = 0
+          
+          if (srcRatio > tgtRatio) {
+            // Zdrojový je širší - přizpůsobíme šířku, výška bude menší
+            drawWidth = fmt.width
+            drawHeight = fmt.width / srcRatio
+            drawY = (fmt.height - drawHeight) / 2
+          } else {
+            // Zdrojový je vyšší - přizpůsobíme výšku, šířka bude menší
+            drawHeight = fmt.height
+            drawWidth = fmt.height * srcRatio
+            drawX = (fmt.width - drawWidth) / 2
+          }
+          
+          // Pozadí (bílé nebo z brand kit)
+          ctx.fillStyle = currentBrandKit?.backgroundColor || '#ffffff'
+          ctx.fillRect(0, 0, fmt.width, fmt.height)
+          
+          // Nakresli obrázek zachovaný celý
+          ctx.drawImage(img, 0, 0, img.width, img.height, drawX, drawY, drawWidth, drawHeight)
+        } else if (catType === 'image' && cropMode === 'smart') {
+          // SMART režim: inteligentní ořez
           try {
             cropResult = await calculateSmartCrop(sourceImage, fmt.width, fmt.height, { minScale: 0.5 })
           } catch {
             // Fallback na základní crop
-            const srcRatio = img.width / img.height
-            const tgtRatio = fmt.width / fmt.height
             if (srcRatio > tgtRatio) {
               const newW = img.height * tgtRatio
               cropResult = { x: (img.width - newW) / 2, y: 0, width: newW, height: img.height }
@@ -361,10 +395,13 @@ export default function App() {
               cropResult = { x: 0, y: (img.height - newH) / 2, width: img.width, height: newH }
             }
           }
+          ctx.drawImage(
+            img,
+            cropResult.x, cropResult.y, cropResult.width, cropResult.height,
+            0, 0, fmt.width, fmt.height
+          )
         } else {
-          // Pro branding - fit celý obrázek
-          const srcRatio = img.width / img.height
-          const tgtRatio = fmt.width / fmt.height
+          // Pro branding nebo fallback - center crop
           if (srcRatio > tgtRatio) {
             const newW = img.height * tgtRatio
             cropResult = { x: (img.width - newW) / 2, y: 0, width: newW, height: img.height }
@@ -372,14 +409,12 @@ export default function App() {
             const newH = img.width / tgtRatio
             cropResult = { x: 0, y: (img.height - newH) / 2, width: img.width, height: newH }
           }
+          ctx.drawImage(
+            img,
+            cropResult.x, cropResult.y, cropResult.width, cropResult.height,
+            0, 0, fmt.width, fmt.height
+          )
         }
-
-        // Draw image
-        ctx.drawImage(
-          img,
-          cropResult.x, cropResult.y, cropResult.width, cropResult.height,
-          0, 0, fmt.width, fmt.height
-        )
 
         // Draw text overlay
         if (textOverlay.enabled) {
@@ -418,14 +453,42 @@ export default function App() {
         })
       }
 
-      addCreatives(newCreatives)
+      // Upload do R2 pokud je nakonfigurováno
+      let finalCreatives = newCreatives
+      if (isR2Configured(r2Config)) {
+        setProgress(95)
+        try {
+          const uploadResults = await uploadCreativesToR2Batch(
+            r2Config,
+            newCreatives.map(c => ({
+              id: c.id,
+              imageUrl: c.imageUrl,
+              platform: c.platform,
+              format: c.format,
+            }))
+          )
+          
+          // Update URLs with R2 URLs
+          finalCreatives = newCreatives.map(c => {
+            const result = uploadResults.find(r => r.id === c.id)
+            if (result?.uploadedToR2) {
+              return { ...c, imageUrl: result.imageUrl }
+            }
+            return c
+          })
+        } catch (err) {
+          console.warn('R2 upload failed, using local storage:', err)
+        }
+      }
+
+      addCreatives(finalCreatives)
 
       // Save to history
       addToHistory({
         id: generateId(),
         prompt,
         sourceImage,
-        creatives: newCreatives,
+        creatives: finalCreatives,
         textOverlay,
         watermark,
         qrCode,
@@ -643,6 +706,47 @@ export default function App() {
               {sourceImage && (
                 <div className="relative rounded-lg overflow-hidden border border-gray-200">
                   <img src={sourceImage} alt="Source" className="w-full" />
+                </div>
+              )}
+
+              {/* Crop Mode */}
+              {sourceImage && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-2">
+                    Režim ořezu
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCropMode('smart')}
+                      className={cn(
+                        'flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2',
+                        cropMode === 'smart'
+                          ? 'bg-blue-50 text-[#1a73e8] border border-[#1a73e8]'
+                          : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-gray-300'
+                      )}
+                    >
+                      <Wand2 className="w-3 h-3" />
+                      Smart Crop
+                    </button>
+                    <button
+                      onClick={() => setCropMode('fit')}
+                      className={cn(
+                        'flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2',
+                        cropMode === 'fit'
+                          ? 'bg-blue-50 text-[#1a73e8] border border-[#1a73e8]'
+                          : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-gray-300'
+                      )}
+                    >
+                      <LayoutGrid className="w-3 h-3" />
+                      Fit (celý)
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {cropMode === 'smart' 
+                      ? 'AI detekuje hlavní objekt a ořízne' 
+                      : 'Zachová celý obrázek (pro grafiky s textem)'
+                    }
+                  </p>
                 </div>
               )}
             </div>

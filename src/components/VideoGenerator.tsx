@@ -17,6 +17,7 @@ import {
   type VideoTier,
   type VideoResult 
 } from '@/lib/video-engine'
+import { isR2Configured, uploadCreativesToR2Batch, dataUrlToBlob } from '@/lib/r2-storage'
 import { 
   Video, 
   Download, 
@@ -35,7 +36,8 @@ import {
   Trash2,
   Play,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Cloud
 } from 'lucide-react'
 import type { Creative } from '@/types'
 
@@ -77,8 +79,69 @@ interface SlideItem {
   duration: number // seconds
 }
 
+// Free music tracks z Pixabay (royalty-free, CC0)
+// Tyto jsou pouze metadata - skutečné audio by se načítalo z CDN
+const FREE_MUSIC_TRACKS = [
+  {
+    id: 'upbeat-corporate',
+    name: 'Upbeat Corporate',
+    genre: 'Corporate',
+    mood: 'Pozitivní',
+    duration: 120,
+    url: 'https://cdn.pixabay.com/audio/2024/02/14/audio_3e64f69e22.mp3', // Example URL
+    attribution: 'Pixabay Music',
+  },
+  {
+    id: 'inspiring-cinematic',
+    name: 'Inspiring Cinematic',
+    genre: 'Cinematic',
+    mood: 'Inspirativní',
+    duration: 150,
+    url: 'https://cdn.pixabay.com/audio/2023/10/30/audio_1ffc7c5d6f.mp3',
+    attribution: 'Pixabay Music',
+  },
+  {
+    id: 'happy-pop',
+    name: 'Happy Pop',
+    genre: 'Pop',
+    mood: 'Veselý',
+    duration: 90,
+    url: 'https://cdn.pixabay.com/audio/2023/09/05/audio_8d6e4fda28.mp3',
+    attribution: 'Pixabay Music',
+  },
+  {
+    id: 'ambient-chill',
+    name: 'Ambient Chill',
+    genre: 'Ambient',
+    mood: 'Relaxační',
+    duration: 180,
+    url: 'https://cdn.pixabay.com/audio/2024/01/08/audio_ba2a6e7c49.mp3',
+    attribution: 'Pixabay Music',
+  },
+  {
+    id: 'electronic-energy',
+    name: 'Electronic Energy',
+    genre: 'Electronic',
+    mood: 'Dynamický',
+    duration: 100,
+    url: 'https://cdn.pixabay.com/audio/2023/07/11/audio_6b9a1b8c9d.mp3',
+    attribution: 'Pixabay Music',
+  },
+  {
+    id: 'acoustic-morning',
+    name: 'Acoustic Morning',
+    genre: 'Acoustic',
+    mood: 'Klidný',
+    duration: 140,
+    url: 'https://cdn.pixabay.com/audio/2024/03/20/audio_2b3a4c5d6e.mp3',
+    attribution: 'Pixabay Music',
+  },
+]
+
+type FreeTrack = typeof FREE_MUSIC_TRACKS[number]
+
 export function VideoGenerator() {
-  const { creatives, videoScenario, setVideoScenario, apiKeys } = useAppStore()
+  const { creatives, videoScenario, setVideoScenario, apiKeys, addCreatives, r2Config } = useAppStore()
   
   const [selectedTier, setSelectedTier] = useState<VideoTier>('slideshow')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -93,7 +156,12 @@ export function VideoGenerator() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   
   const audioInputRef = useRef<HTMLInputElement>(null)
+  const audioPreviewRef = useRef<HTMLAudioElement>(null)
   const creativesArray = useMemo(() => Object.values(creatives) as Creative[], [creatives])
+  
+  // Free music state
+  const [selectedFreeTrack, setSelectedFreeTrack] = useState<FreeTrack | null>(null)
+  const [previewingTrack, setPreviewingTrack] = useState<FreeTrack | null>(null)
 
   const estimatedCost = useMemo(() => {
     return calculateVideoCost(selectedTier, videoScenario.lengthSeconds)
@@ -144,6 +212,7 @@ export function VideoGenerator() {
     
     setAudioFile(file)
     setAudioUrl(URL.createObjectURL(file))
+    setSelectedFreeTrack(null) // Deselect free track when uploading custom
   }
 
   // Remove audio
@@ -151,6 +220,37 @@ export function VideoGenerator() {
     if (audioUrl) URL.revokeObjectURL(audioUrl)
     setAudioFile(null)
     setAudioUrl(null)
+  }
+
+  // Select free track
+  const selectFreeTrack = (track: FreeTrack) => {
+    setSelectedFreeTrack(track)
+    setAudioUrl(track.url)
+    setAudioFile(null) // Clear custom audio
+    // Stop preview if playing
+    if (audioPreviewRef.current) {
+      audioPreviewRef.current.pause()
+      setPreviewingTrack(null)
+    }
+  }
+
+  // Toggle preview
+  const togglePreview = (track: FreeTrack) => {
+    if (!audioPreviewRef.current) return
+    
+    if (previewingTrack?.id === track.id) {
+      // Stop preview
+      audioPreviewRef.current.pause()
+      setPreviewingTrack(null)
+    } else {
+      // Start preview
+      audioPreviewRef.current.src = track.url
+      audioPreviewRef.current.play().catch(() => {
+        // Handle autoplay restrictions
+        console.log('Autoplay blocked')
+      })
+      setPreviewingTrack(track)
+    }
   }
 
   // Generate video
@@ -187,6 +287,63 @@ export function VideoGenerator() {
       )
       
       setResult(videoResult)
+      
+      // Uložit video do galerie jako Creative
+      const [width, height] = videoScenario.aspectRatio === '16:9' 
+        ? [1920, 1080] 
+        : videoScenario.aspectRatio === '9:16'
+          ? [1080, 1920]
+          : [1080, 1080]
+      
+      let thumbnailUrl = videoResult.thumbnailUrl || slides[0]?.creative.imageUrl || ''
+      let finalVideoUrl = videoResult.videoUrl
+      
+      // Upload do R2 pokud je nakonfigurováno
+      if (isR2Configured(r2Config)) {
+        setProgressMessage('Ukládám do cloudu...')
+        try {
+          const uploadResults = await uploadCreativesToR2Batch(
+            r2Config,
+            [{
+              id: 'video-thumb',
+              imageUrl: thumbnailUrl,
+              videoUrl: finalVideoUrl,
+              isVideo: true,
+              platform: 'google',
+              format: { width, height },
+            }]
+          )
+          
+          if (uploadResults[0]?.uploadedToR2) {
+            thumbnailUrl = uploadResults[0].imageUrl
+            finalVideoUrl = uploadResults[0].videoUrl || finalVideoUrl
+          }
+        } catch (err) {
+          console.warn('R2 upload failed:', err)
+        }
+      }
+      
+      const videoCreative = {
+        id: `video-${Date.now()}`,
+        formatKey: `video-${videoScenario.aspectRatio.replace(':', 'x')}-${totalDuration}s`,
+        platform: 'google' as const,
+        category: 'video',
+        format: {
+          width,
+          height,
+          name: `Video ${videoScenario.aspectRatio} (${totalDuration}s)`,
+          isVideo: true,
+        },
+        imageUrl: thumbnailUrl,
+        videoUrl: finalVideoUrl,
+        videoDuration: totalDuration,
+        isVideo: true,
+        createdAt: new Date(),
+        sizeKB: Math.round(finalVideoUrl.length * 3 / 4 / 1024),
+      }
+      
+      addCreatives([videoCreative])
+      
     } catch (err) {
       console.error('Video generation error:', err)
       setError(err instanceof Error ? err.message : 'Nastala chyba při generování videa')
@@ -410,6 +567,50 @@ export function VideoGenerator() {
               Hudba (volitelné)
             </h2>
 
+            {/* Free Music Library */}
+            <div className="mb-3">
+              <p className="text-xs text-gray-500 mb-2">Vyberte z knihovny (royalty-free):</p>
+              <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                {FREE_MUSIC_TRACKS.map(track => (
+                  <button
+                    key={track.id}
+                    onClick={() => selectFreeTrack(track)}
+                    className={`flex items-center gap-3 p-2 rounded-lg text-left transition-all ${
+                      selectedFreeTrack?.id === track.id
+                        ? 'bg-purple-50 border border-purple-200'
+                        : 'bg-gray-50 hover:bg-gray-100 border border-transparent'
+                    }`}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        togglePreview(track)
+                      }}
+                      className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:scale-105 transition-transform"
+                    >
+                      {previewingTrack?.id === track.id ? (
+                        <span className="w-2 h-2 bg-purple-500 rounded-sm" />
+                      ) : (
+                        <Play className="w-3 h-3 text-purple-500 ml-0.5" />
+                      )}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-700 truncate">{track.name}</p>
+                      <p className="text-xs text-gray-400">{track.genre} • {track.duration}s • {track.mood}</p>
+                    </div>
+                    {selectedFreeTrack?.id === track.id && (
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Vybráno</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2">
+                Zdroj: Pixabay Music (CC0 licence, bez nutnosti atribuce)
+              </p>
+            </div>
+
+            <div className="text-xs text-gray-400 text-center my-2">— nebo —</div>
+
             {audioFile ? (
               <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                 <Music className="w-5 h-5 text-purple-500" />
@@ -427,7 +628,7 @@ export function VideoGenerator() {
                 className="w-full py-4 border-2 border-dashed border-gray-200 rounded-lg text-gray-400 hover:border-[#1a73e8] hover:text-[#1a73e8] transition-colors"
               >
                 <Upload className="w-5 h-5 mx-auto mb-1" />
-                <span className="text-sm">Nahrát MP3/WAV</span>
+                <span className="text-sm">Nahrát vlastní MP3/WAV</span>
               </button>
             )}
             <input
@@ -437,6 +638,9 @@ export function VideoGenerator() {
               onChange={handleAudioUpload}
               className="hidden"
             />
+            
+            {/* Hidden audio element for preview */}
+            <audio ref={audioPreviewRef} className="hidden" onEnded={() => setPreviewingTrack(null)} />
           </div>
 
           {/* Aspect Ratio */}

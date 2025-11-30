@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { testApiKey } from '@/lib/openai-client'
 import { PRESET_SOURCES, ALL_PRESETS } from '@/lib/format-presets'
+import { getStorageStats, resetStorageStats, R2_STORAGE_LIMIT_GB, formatBytes } from '@/lib/r2-storage'
+import type { R2StorageStats } from '@/lib/r2-storage'
 import {
   Dialog,
   DialogContent,
@@ -21,7 +23,10 @@ import {
   ExternalLink,
   FileText,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Cloud,
+  HardDrive,
+  AlertTriangle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -31,11 +36,20 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
-  const { apiKeys, setApiKeys } = useAppStore()
+  const { apiKeys, setApiKeys, r2Config, setR2Config } = useAppStore()
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testMessage, setTestMessage] = useState('')
   const [showFormatSources, setShowFormatSources] = useState(false)
-  const [activeTab, setActiveTab] = useState<'api' | 'formats'>('api')
+  const [activeTab, setActiveTab] = useState<'api' | 'storage' | 'formats'>('api')
+  const [r2TestStatus, setR2TestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
+  const [storageStats, setStorageStats] = useState<R2StorageStats>(getStorageStats())
+
+  // Refresh storage stats when tab changes
+  useEffect(() => {
+    if (activeTab === 'storage') {
+      setStorageStats(getStorageStats())
+    }
+  }, [activeTab])
 
   const handleTest = async () => {
     if (!apiKeys.openai) {
@@ -102,7 +116,19 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             )}
           >
             <Key className="w-4 h-4 inline mr-2" />
-            API Klíče
+            API
+          </button>
+          <button
+            onClick={() => setActiveTab('storage')}
+            className={cn(
+              'flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all',
+              activeTab === 'storage'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            )}
+          >
+            <Cloud className="w-4 h-4 inline mr-2" />
+            Storage
           </button>
           <button
             onClick={() => setActiveTab('formats')}
@@ -227,6 +253,207 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   <span className="font-medium">Slideshow:</span> zdarma (lokální)
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Storage Tab - Cloudflare R2 */}
+        {activeTab === 'storage' && (
+          <div className="space-y-4">
+            {/* Storage Usage - Progress Bar */}
+            <div className={cn(
+              'p-4 rounded-lg border',
+              storageStats.isOverLimit 
+                ? 'bg-red-50 border-red-200'
+                : storageStats.isNearLimit
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-gray-50 border-gray-200'
+            )}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <HardDrive className={cn(
+                    'w-4 h-4',
+                    storageStats.isOverLimit 
+                      ? 'text-red-600'
+                      : storageStats.isNearLimit
+                        ? 'text-amber-600'
+                        : 'text-gray-600'
+                  )} />
+                  <span className="text-sm font-medium">Využité místo</span>
+                </div>
+                <span className={cn(
+                  'text-sm font-bold',
+                  storageStats.isOverLimit 
+                    ? 'text-red-700'
+                    : storageStats.isNearLimit
+                      ? 'text-amber-700'
+                      : 'text-gray-700'
+                )}>
+                  {storageStats.usedGB} / {storageStats.limitGB} GB
+                </span>
+              </div>
+              
+              {/* Progress bar */}
+              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className={cn(
+                    'h-full rounded-full transition-all',
+                    storageStats.isOverLimit 
+                      ? 'bg-red-500'
+                      : storageStats.isNearLimit
+                        ? 'bg-amber-500'
+                        : 'bg-green-500'
+                  )}
+                  style={{ width: `${Math.min(storageStats.percentUsed, 100)}%` }}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between mt-2 text-xs">
+                <span className="text-gray-500">
+                  {storageStats.percentUsed}% využito
+                </span>
+                <span className="text-gray-500">
+                  Zbývá: {storageStats.remainingGB} GB
+                </span>
+              </div>
+              
+              {storageStats.isNearLimit && !storageStats.isOverLimit && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-amber-700">
+                  <AlertTriangle className="w-3 h-3" />
+                  Blížíte se limitu! Zvažte smazání starých kreativ.
+                </div>
+              )}
+              
+              {storageStats.isOverLimit && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-red-700">
+                  <AlertTriangle className="w-3 h-3" />
+                  Limit překročen! Upload nových souborů je zablokován.
+                </div>
+              )}
+              
+              {/* Reset button */}
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    if (confirm('Resetovat počítadlo? Použijte po ručním vyčištění bucketu v Cloudflare.')) {
+                      resetStorageStats()
+                      setStorageStats(getStorageStats())
+                    }
+                  }}
+                  className="text-xs text-gray-500"
+                >
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Resetovat počítadlo
+                </Button>
+              </div>
+            </div>
+
+            {/* R2 Status */}
+            <div className={cn(
+              'p-3 rounded-lg border flex items-center gap-3',
+              r2Config?.accountId
+                ? 'bg-green-50 border-green-200'
+                : 'bg-gray-50 border-gray-200'
+            )}>
+              <Cloud className={cn(
+                'w-5 h-5',
+                r2Config?.accountId ? 'text-green-600' : 'text-gray-400'
+              )} />
+              <div className="flex-1">
+                <div className={cn(
+                  'text-sm font-medium',
+                  r2Config?.accountId ? 'text-green-800' : 'text-gray-600'
+                )}>
+                  {r2Config?.accountId ? 'R2 nakonfigurováno' : 'R2 není nakonfigurováno'}
+                </div>
+                {r2Config?.bucketName && (
+                  <div className="text-xs text-green-600">
+                    Bucket: {r2Config.bucketName}
+                  </div>
+                )}
+              </div>
+              {r2Config?.accountId && (
+                <CheckCircle className="w-5 h-5 text-green-500" />
+              )}
+            </div>
+
+            {/* R2 Form */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Account ID
+                </label>
+                <Input
+                  value={r2Config?.accountId || ''}
+                  onChange={(e) => setR2Config({ accountId: e.target.value })}
+                  placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  className="font-mono text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Bucket Name
+                </label>
+                <Input
+                  value={r2Config?.bucketName || ''}
+                  onChange={(e) => setR2Config({ bucketName: e.target.value })}
+                  placeholder="my-bucket"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Access Key ID
+                </label>
+                <Input
+                  value={r2Config?.accessKeyId || ''}
+                  onChange={(e) => setR2Config({ accessKeyId: e.target.value })}
+                  placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  className="font-mono text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Secret Access Key
+                </label>
+                <Input
+                  type="password"
+                  value={r2Config?.secretAccessKey || ''}
+                  onChange={(e) => setR2Config({ secretAccessKey: e.target.value })}
+                  placeholder="••••••••••••••••••••••••••••••••"
+                  className="font-mono text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Public URL
+                </label>
+                <Input
+                  value={r2Config?.publicUrl || ''}
+                  onChange={(e) => setR2Config({ publicUrl: e.target.value })}
+                  placeholder="https://xxx.r2.cloudflarestorage.com/bucket"
+                  className="text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Formát: https://[account-id].r2.cloudflarestorage.com/[bucket]
+                </p>
+              </div>
+            </div>
+
+            {/* Info */}
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <h4 className="text-xs font-medium text-blue-800 mb-1">
+                💡 Tip: Limit 9 GB
+              </h4>
+              <p className="text-xs text-blue-700">
+                Držíme 1 GB rezervu pro jistotu. Cloudflare free tier má 10 GB.
+                Po vyčištění bucketu v Cloudflare klikněte "Resetovat počítadlo".
+              </p>
             </div>
           </div>
         )}

@@ -160,6 +160,10 @@ export interface Creative {
   // Je HTML5?
   isHTML5?: boolean
   html5Content?: string
+  // Je Video?
+  isVideo?: boolean
+  videoUrl?: string
+  videoDuration?: number // v sekundách
   // Prošla validací?
   isValid?: boolean
   validationErrors?: string[]
@@ -360,6 +364,14 @@ export interface ApiKeys {
   openai: string
 }
 
+export interface R2Config {
+  accountId: string
+  accessKeyId: string
+  secretAccessKey: string
+  bucketName: string
+  publicUrl?: string
+}
+
 export type ModelTier = 'cheap' | 'standard' | 'best'
 
 // ============================================================================
@@ -403,9 +415,11 @@ export interface AppState {
   sourceImage: string | null
   sourceVariants: SourceImageVariant[]
   activeSourceVariant: string | null
+  cropMode: 'smart' | 'fit'
   setPrompt: (prompt: string) => void
   setSourceFormat: (format: 'landscape' | 'square' | 'portrait') => void
   setSourceImage: (image: string | null) => void
+  setCropMode: (mode: 'smart' | 'fit') => void
   setSourceVariants: (variants: SourceImageVariant[]) => void
   addSourceVariant: (variant: SourceImageVariant) => void
   setActiveSourceVariant: (id: string | null) => void
@@ -423,6 +437,8 @@ export interface AppState {
   // Creatives
   creatives: Record<string, Creative>
   addCreatives: (creatives: Creative[]) => void
+  deleteCreative: (id: string) => void
+  deleteCreatives: (ids: string[]) => void
   clearCreatives: () => void
   
   // Text Overlay
@@ -471,6 +487,10 @@ export interface AppState {
   // API Keys
   apiKeys: ApiKeys
   setApiKeys: (keys: Partial<ApiKeys>) => void
+  
+  // R2 Storage
+  r2Config: R2Config | null
+  setR2Config: (config: Partial<R2Config>) => void
   
   // UI State
   isGenerating: boolean

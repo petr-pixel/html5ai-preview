@@ -66,9 +66,11 @@ export const useAppStore = create<AppState>()(
       sourceImage: null,
       sourceVariants: [] as SourceImageVariant[],
       activeSourceVariant: null as string | null,
+      cropMode: 'smart' as 'smart' | 'fit', // smart = Smart Crop, fit = zachovat celý obrázek
       setPrompt: (prompt) => set({ prompt }),
       setSourceFormat: (format) => set({ sourceFormat: format }),
       setSourceImage: (image) => set({ sourceImage: image }),
+      setCropMode: (mode) => set({ cropMode: mode }),
       setSourceVariants: (variants) => set({ sourceVariants: variants }),
       addSourceVariant: (variant) =>
         set((state) => {
@@ -123,6 +125,16 @@ export const useAppStore = create<AppState>()(
         set((state) => {
           creatives.forEach((c) => {
             state.creatives[c.id] = c
+          })
+        }),
+      deleteCreative: (id) =>
+        set((state) => {
+          delete state.creatives[id]
+        }),
+      deleteCreatives: (ids) =>
+        set((state) => {
+          ids.forEach((id) => {
+            delete state.creatives[id]
           })
         }),
       clearCreatives: () => set({ creatives: {} }),
@@ -198,6 +210,15 @@ export const useAppStore = create<AppState>()(
         openai: '',
       },
 
+      // R2 Storage Config
+      r2Config: null,
+      setR2Config: (config) =>
+        set((state) => {
+          state.r2Config = state.r2Config 
+            ? { ...state.r2Config, ...config }
+            : { accountId: '', accessKeyId: '', secretAccessKey: '', bucketName: '', publicUrl: '', ...config }
+        }),
+
       // Model tiers
       textModelTier: 'standard',
       imageModelTier: 'standard',
@@ -223,6 +244,7 @@ export const useAppStore = create<AppState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         apiKeys: state.apiKeys,
+        r2Config: state.r2Config,
         history: state.history,
         textOverlay: state.textOverlay,
         watermark: state.watermark,

@@ -14,6 +14,8 @@ import { useAppStore } from '@/stores/app-store'
 import { Button, Card, Progress, Badge } from '@/components/ui'
 import { generateId, cn, loadImage } from '@/lib/utils'
 import { platforms } from '@/lib/platforms'
+import { downloadBlob, createCreativePackZip } from '@/lib/export'
+import { isR2Configured, uploadCreativesToR2Batch } from '@/lib/r2-storage'
 import { 
   Rocket, 
   Globe, 
@@ -28,7 +30,12 @@ import {
   Sparkles,
   Building2,
   Target,
-  Languages
+  Languages,
+  Cloud,
+  Eye,
+  AlertTriangle,
+  CheckCircle,
+  Image as ImageIcon
 } from 'lucide-react'
 import type { 
   QuickModeConfig, 
@@ -161,6 +168,7 @@ export function QuickMode() {
     apiKeys,
     setSourceImage,
     addCreatives,
+    r2Config,
   } = useAppStore()
 
   // Config state
@@ -192,6 +200,7 @@ export function QuickMode() {
   const [progress, setProgress] = useState(0)
   const [progressMessage, setProgressMessage] = useState('')
   const [generatedBundle, setGeneratedBundle] = useState<any>(null)
+  const [previewFormat, setPreviewFormat] = useState('1200x628')
 
   // Current template
   const currentTemplate = useMemo(() => 
@@ -450,11 +459,44 @@ export function QuickMode() {
       setProgress(100)
       setProgressMessage('Hotovo!')
       
+      // Upload do R2 pokud je nakonfigurováno
+      let finalCreatives = allCreatives
+      if (isR2Configured(r2Config)) {
+        setProgressMessage('Ukládám do cloudu...')
+        try {
+          const uploadResults = await uploadCreativesToR2Batch(
+            r2Config,
+            allCreatives.map(c => ({
+              id: c.id,
+              imageUrl: c.imageUrl,
+              platform: c.platform,
+              format: c.format,
+            }))
+          )
+          
+          // Update URLs with R2 URLs
+          finalCreatives = allCreatives.map(c => {
+            const result = uploadResults.find(r => r.id === c.id)
+            if (result?.uploadedToR2) {
+              return { ...c, imageUrl: result.imageUrl }
+            }
+            return c
+          })
+          setProgressMessage('Hotovo! Uloženo do cloudu.')
+        } catch (err) {
+          console.warn('R2 upload failed, using local storage:', err)
+          setProgressMessage('Hotovo! (cloud upload selhal)')
+        }
+      }
+      
+      // Automaticky uložit do hlavní galerie
+      addCreatives(finalCreatives)
+      
       setGeneratedBundle({
         timestamp: new Date(),
         languages: config.languages,
-        bannerCount: allCreatives.length,
-        creatives: allCreatives,
+        bannerCount: finalCreatives.length,
+        creatives: finalCreatives,
       })
 
     } catch (err: any) {
@@ -543,26 +585,37 @@ Suitable for banner ads and display advertising.`
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
 
-    // Smart crop calculation
+    // FIT režim: zachovat celý obrázek s bílým pozadím
+    // Tohle funguje lépe pro AI generované bannery
     const srcRatio = sourceImg.width / sourceImg.height
     const tgtRatio = format.width / format.height
-    let cropX = 0, cropY = 0, cropW = sourceImg.width, cropH = sourceImg.height
-
+    
+    let drawWidth = format.width
+    let drawHeight = format.height
+    let drawX = 0
+    let drawY = 0
+    
     if (srcRatio > tgtRatio) {
-      cropW = sourceImg.height * tgtRatio
-      cropX = (sourceImg.width - cropW) / 2
+      // Zdrojový je širší - přizpůsobíme šířku, výška bude menší
+      drawWidth = format.width
+      drawHeight = format.width / srcRatio
+      drawY = (format.height - drawHeight) / 2
     } else {
-      cropH = sourceImg.width / tgtRatio
-      cropY = (sourceImg.height - cropH) / 2
+      // Zdrojový je vyšší - přizpůsobíme výšku, šířka bude menší
+      drawHeight = format.height
+      drawWidth = format.height * srcRatio
+      drawX = (format.width - drawWidth) / 2
     }
+    
+    // Bílé pozadí
+    ctx.fillStyle = brandKit?.backgroundColor || '#ffffff'
+    ctx.fillRect(0, 0, format.width, format.height)
+    
+    // Nakresli obrázek zachovaný celý
+    ctx.drawImage(sourceImg, 0, 0, sourceImg.width, sourceImg.height, drawX, drawY, drawWidth, drawHeight)
 
-    // Draw image
-    ctx.drawImage(sourceImg, cropX, cropY, cropW, cropH, 0, 0, format.width, format.height)
-
-    // Draw text overlay
-    if (texts.headline || texts.subheadline || texts.cta) {
-      drawQuickModeTextOverlay(ctx, format.width, format.height, texts, brandKit)
-    }
+    // Text overlay je VYPNUTÝ - texty jsou součástí AI generovaného obrázku
+    // Uživatel může přidat text dodatečně v Galerii pomocí "Přidat text" tlačítka
 
     const imageUrl = canvas.toDataURL('image/png')
 
@@ -751,83 +804,196 @@ Suitable for banner ads and display advertising.`
 
       case 2:
         return (
-          <div className="space-y-6">
-            {/* Campaign Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Název kampaně
-              </label>
-              <input
-                type="text"
-                value={config.campaignName}
-                onChange={e => updateConfig({ campaignName: e.target.value })}
-                placeholder="např. Zimni_vyprodej_2025"
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Landing URL */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Landing page URL
-              </label>
-              <input
-                type="url"
-                value={config.landingUrl}
-                onChange={e => updateConfig({ landingUrl: e.target.value })}
-                placeholder="https://example.com/akce/"
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Brief Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Popis kampaně pro AI
-                <span className="text-gray-400 font-normal ml-2">
-                  (co chcete komunikovat)
-                </span>
-              </label>
-              <textarea
-                value={config.briefDescription}
-                onChange={e => updateConfig({ briefDescription: e.target.value })}
-                placeholder="Zimní bundy se slevou 20%, důraz na teplo a kvalitu materiálů, cílíme na aktivní lidi co chodí do přírody..."
-                rows={3}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Template Variables */}
-            {currentTemplate && currentTemplate.variables.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left: Form */}
+            <div className="space-y-5">
+              {/* Campaign Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Proměnné šablony
+                  Název kampaně
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {currentTemplate.variables.map(variable => (
-                    <div key={variable}>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        %{variable}%
-                      </label>
-                      <input
-                        type="text"
-                        value={config.variables[variable] || ''}
-                        onChange={e => updateConfig({
-                          variables: { ...config.variables, [variable]: e.target.value }
-                        })}
-                        placeholder={
-                          variable === 'X' ? '20' :
-                          variable === 'DATE' ? '31.12.' :
-                          variable === 'PRODUCT' ? 'bundy' :
-                          variable
-                        }
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                      />
+                <input
+                  type="text"
+                  value={config.campaignName}
+                  onChange={e => updateConfig({ campaignName: e.target.value })}
+                  placeholder="např. Zimni_vyprodej_2025"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Landing URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Landing page URL
+                </label>
+                <input
+                  type="url"
+                  value={config.landingUrl}
+                  onChange={e => updateConfig({ landingUrl: e.target.value })}
+                  placeholder="https://example.com/akce/"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Brief Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Popis pro AI generátor
+                  <span className="text-gray-400 font-normal ml-2 text-xs">
+                    (co zobrazit na obrázku)
+                  </span>
+                </label>
+                <textarea
+                  value={config.briefDescription}
+                  onChange={e => updateConfig({ briefDescription: e.target.value })}
+                  placeholder="Zimní bundy se slevou 20%, důraz na teplo a kvalitu materiálů..."
+                  rows={2}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+
+              {/* Template Variables */}
+              {currentTemplate && currentTemplate.variables.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Proměnné šablony
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {currentTemplate.variables.map(variable => (
+                      <div key={variable}>
+                        <label className="block text-xs text-gray-500 mb-1">
+                          %{variable}%
+                        </label>
+                        <input
+                          type="text"
+                          value={config.variables[variable] || ''}
+                          onChange={e => updateConfig({
+                            variables: { ...config.variables, [variable]: e.target.value }
+                          })}
+                          placeholder={
+                            variable === 'X' ? '20' :
+                            variable === 'DATE' ? '31.12.' :
+                            variable === 'PRODUCT' ? 'bundy' :
+                            variable
+                          }
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Live Preview */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700">
+                  <Eye className="w-4 h-4 inline mr-2" />
+                  Live Preview
+                </label>
+                <select 
+                  className="text-xs border border-gray-200 rounded px-2 py-1"
+                  value={previewFormat}
+                  onChange={e => setPreviewFormat(e.target.value)}
+                >
+                  <option value="1200x628">1200×628 (FB/Google)</option>
+                  <option value="300x250">300×250 (GDN)</option>
+                  <option value="300x300">300×300 (Sklik)</option>
+                  <option value="970x310">970×310 (Billboard)</option>
+                </select>
+              </div>
+              
+              {/* Preview Box */}
+              <div className="bg-gray-100 rounded-xl p-4 flex items-center justify-center min-h-[200px]">
+                <div 
+                  className="bg-white rounded-lg shadow-lg overflow-hidden flex items-center justify-center"
+                  style={{
+                    width: previewFormat === '1200x628' ? '300px' : 
+                           previewFormat === '300x250' ? '200px' :
+                           previewFormat === '300x300' ? '200px' : '290px',
+                    height: previewFormat === '1200x628' ? '157px' : 
+                            previewFormat === '300x250' ? '167px' :
+                            previewFormat === '300x300' ? '200px' : '93px',
+                  }}
+                >
+                  {/* Simulated preview content */}
+                  <div className="w-full h-full relative bg-gradient-to-br from-gray-200 to-gray-300 flex flex-col justify-end p-3">
+                    {/* Simulated image placeholder */}
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                      <ImageIcon className="w-12 h-12 opacity-30" />
                     </div>
-                  ))}
+                    
+                    {/* Text overlay simulation */}
+                    <div className="relative z-10 bg-black/50 rounded-lg p-2">
+                      {currentTemplate && (
+                        <>
+                          <div className="text-white font-bold text-sm truncate">
+                            {(() => {
+                              let headline = currentTemplate.headlines['cs']?.[0] || 'Headline'
+                              currentTemplate.variables.forEach(v => {
+                                headline = headline.replace(`%${v}%`, config.variables[v] || `[${v}]`)
+                              })
+                              return headline
+                            })()}
+                          </div>
+                          {currentTemplate.subheadlines['cs']?.[0] && (
+                            <div className="text-white/80 text-xs truncate">
+                              {(() => {
+                                let sub = currentTemplate.subheadlines['cs']?.[0] || ''
+                                currentTemplate.variables.forEach(v => {
+                                  sub = sub.replace(`%${v}%`, config.variables[v] || `[${v}]`)
+                                })
+                                return sub
+                              })()}
+                            </div>
+                          )}
+                          <div 
+                            className="mt-1 px-2 py-0.5 rounded text-white text-xs font-medium inline-block"
+                            style={{ backgroundColor: currentBrandKit?.ctaColor || '#f97316' }}
+                          >
+                            {currentTemplate.ctas['cs']?.[0] || 'Zjistit více'}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
+              
+              {/* Preview warnings */}
+              {(() => {
+                const warnings: string[] = []
+                if (currentTemplate) {
+                  currentTemplate.variables.forEach(v => {
+                    if (!config.variables[v]) {
+                      warnings.push(`Chybí hodnota pro %${v}%`)
+                    }
+                  })
+                }
+                if (!config.briefDescription) {
+                  warnings.push('Zadejte popis pro AI generátor')
+                }
+                
+                if (warnings.length === 0) return (
+                  <div className="flex items-center gap-2 text-green-600 text-xs bg-green-50 rounded-lg p-2">
+                    <CheckCircle className="w-4 h-4" />
+                    Vše vypadá dobře!
+                  </div>
+                )
+                
+                return (
+                  <div className="bg-amber-50 rounded-lg p-2 space-y-1">
+                    {warnings.map((w, i) => (
+                      <div key={i} className="flex items-center gap-2 text-amber-600 text-xs">
+                        <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                        {w}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </div>
           </div>
         )
 
@@ -1033,11 +1199,31 @@ Suitable for banner ads and display advertising.`
                   </div>
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <Button className="bg-green-600 hover:bg-green-700 text-white">
+                  <Button 
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={async () => {
+                      if (!generatedBundle.creatives.length) return
+                      try {
+                        const zip = await createCreativePackZip(generatedBundle.creatives, () => {})
+                        downloadBlob(zip, `quickmode-${config.campaignName || 'bundle'}-${Date.now()}.zip`)
+                      } catch (err) {
+                        console.error('ZIP export error:', err)
+                        alert('Chyba při vytváření ZIP')
+                      }
+                    }}
+                  >
                     <Download className="w-4 h-4 mr-2" />
                     Stáhnout vše (ZIP)
                   </Button>
-                  <Button variant="outline">
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      // Uložit kreativy do store
+                      addCreatives(generatedBundle.creatives)
+                      // Navigace do galerie - použijeme window event
+                      window.dispatchEvent(new CustomEvent('navigate', { detail: 'gallery' }))
+                    }}
+                  >
                     Zobrazit v Galerii
                   </Button>
                 </div>
