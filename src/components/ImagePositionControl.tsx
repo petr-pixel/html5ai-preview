@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState, useRef, useMemo } from 'react'
-import { getPresetsForPlatformCategory } from '@/lib/format-presets'
+import { platforms, getFormatKey } from '@/lib/platforms'
 
 const STEP = 5 // Krok posunu v procentech
 
@@ -43,10 +43,16 @@ export function ImagePositionControl() {
 
   // Získej vybrané formáty pro dropdown
   const selectedFormatsList = useMemo(() => {
-    const presets = getPresetsForPlatformCategory(platform, category)
-    return presets
-      .filter(p => selectedFormats.has(p.key))
-      .map(p => ({ key: p.key, name: p.format.name, width: p.format.width, height: p.format.height }))
+    const plat = platforms[platform]
+    const cat = plat?.categories[category]
+    if (!cat) return []
+    
+    return cat.formats
+      .map(f => {
+        const key = getFormatKey(platform, category, f.width, f.height)
+        return { key, name: f.name, width: f.width, height: f.height }
+      })
+      .filter(f => selectedFormats.has(f.key))
   }, [platform, category, selectedFormats])
 
   // Nastav první formát pokud není vybraný
