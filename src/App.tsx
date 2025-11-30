@@ -23,6 +23,7 @@ import { BrandKitManager } from '@/components/BrandKitManager'
 import { VideoGenerator } from '@/components/VideoGenerator'
 import { QuickMode } from '@/components/QuickMode'
 import { SafeZoneOverlay } from '@/components/SafeZoneOverlay'
+import { ImagePositionControl } from '@/components/ImagePositionControl'
 import { downloadBlob, createCreativePackZip } from '@/lib/export'
 import { calculateSmartCrop } from '@/lib/smart-crop'
 import { Button, Progress, Spinner } from '@/components/ui'
@@ -122,6 +123,7 @@ export default function App() {
     brandKits,
     activeBrandKit,
     cropMode,
+    imageOffset,
     r2Config,
     setPlatform,
     setCategory,
@@ -303,6 +305,203 @@ export default function App() {
   }
 
   // ============================================================================
+  // APPLY TEXT TO SOURCE IMAGE
+  // ============================================================================
+
+  const applyTextToSourceImage = async () => {
+    if (!sourceImage) {
+      alert('Nejprve nahrajte nebo vygenerujte zdrojový obrázek')
+      return
+    }
+    if (!textOverlay.headline && !textOverlay.subheadline && !textOverlay.cta) {
+      alert('Zadejte alespoň jeden text (headline, subheadline nebo CTA)')
+      return
+    }
+
+    setIsGenerating(true)
+
+    try {
+      const img = await loadImage(sourceImage)
+      
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')!
+      
+      // Draw original image
+      ctx.drawImage(img, 0, 0)
+      
+      // Draw text overlay
+      const padding = Math.min(img.width, img.height) * 0.04
+      const pos = textOverlay.position
+      
+      // Calculate text position
+      let textX = padding
+      let textY = img.height - padding
+      let textAlign: CanvasTextAlign = 'left'
+      
+      if (pos.includes('right')) {
+        textX = img.width - padding
+        textAlign = 'right'
+      } else if (pos.includes('center') || pos === 'center') {
+        textX = img.width / 2
+        textAlign = 'center'
+      }
+      
+      if (pos.includes('top')) {
+        textY = padding + 40
+      } else if (pos === 'center') {
+        textY = img.height / 2
+      }
+      
+      ctx.textAlign = textAlign
+      
+      // Font sizes relative to image
+      const headlineSize = Math.max(24, img.width * 0.05)
+      const subheadlineSize = Math.max(16, img.width * 0.03)
+      const ctaSize = Math.max(14, img.width * 0.025)
+      
+      let currentY = textY
+      
+      // CTA button
+      if (textOverlay.cta) {
+        const ctaPadding = ctaSize * 0.6
+        ctx.font = `bold ${ctaSize}px system-ui, sans-serif`
+        const ctaMetrics = ctx.measureText(textOverlay.cta)
+        const ctaWidth = ctaMetrics.width + ctaPadding * 2
+        const ctaHeight = ctaSize + ctaPadding * 1.5
+        
+        let ctaX = textX
+        if (textAlign === 'right') ctaX = textX - ctaWidth
+        else if (textAlign === 'center') ctaX = textX - ctaWidth / 2
+        
+        // Button background
+        ctx.fillStyle = textOverlay.ctaColor || '#f97316'
+        drawRoundedRect(ctx, ctaX, currentY - ctaHeight, ctaWidth, ctaHeight, 6)
+        ctx.fill()
+        
+        // Button text
+        ctx.fillStyle = '#ffffff'
+        ctx.fillText(textOverlay.cta, ctaX + ctaPadding, currentY - ctaPadding)
+        
+        currentY -= ctaHeight + 10
+      }
+      
+      // Subheadline
+      if (textOverlay.subheadline) {
+        ctx.font = `${subheadlineSize}px system-ui, sans-serif`
+        ctx.fillStyle = '#ffffff'
+        ctx.shadowColor = 'rgba(0,0,0,0.8)'
+        ctx.shadowBlur = 4
+        ctx.shadowOffsetX = 1
+        ctx.shadowOffsetY = 1
+        ctx.fillText(textOverlay.subheadline, textX, currentY)
+        currentY -= subheadlineSize + 8
+      }
+      
+      // Headline
+      if (textOverlay.headline) {
+        ctx.font = `bold ${headlineSize}px system-ui, sans-serif`
+        ctx.fillStyle = '#ffffff'
+        ctx.shadowColor = 'rgba(0,0,0,0.8)'
+        ctx.shadowBlur = 6
+        ctx.shadowOffsetX = 1
+        ctx.shadowOffsetY = 1
+        ctx.fillText(textOverlay.headline, textX, currentY)
+      }
+      
+      // Reset shadow
+      ctx.shadowColor = 'transparent'
+      ctx.shadowBlur = 0
+      
+      // Update source image
+      const newImageUrl = canvas.toDataURL('image/png')
+      setSourceImage(newImageUrl)
+      
+    } catch (err) {
+      console.error('Error applying text:', err)
+      alert('Chyba při aplikování textu')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  // ============================================================================
+  // APPLY LOGO TO SOURCE IMAGE
+  // ============================================================================
+
+  const applyLogoToSourceImage = async () => {
+    if (!sourceImage) {
+      alert('Nejprve nahrajte nebo vygenerujte zdrojový obrázek')
+      return
+    }
+    if (!watermark.image) {
+      alert('Nejprve nahrajte logo')
+      return
+    }
+
+    setIsGenerating(true)
+
+    try {
+      const img = await loadImage(sourceImage)
+      const logoImg = await loadImage(watermark.image)
+      
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')!
+      
+      // Draw original image
+      ctx.drawImage(img, 0, 0)
+      
+      // Calculate logo size and position
+      const logoWidth = (img.width * watermark.size) / 100
+      const logoHeight = (logoImg.height / logoImg.width) * logoWidth
+      const padding = Math.min(img.width, img.height) * 0.03
+      
+      let logoX = padding
+      let logoY = padding
+      
+      switch (watermark.position) {
+        case 'top-right':
+          logoX = img.width - logoWidth - padding
+          logoY = padding
+          break
+        case 'bottom-left':
+          logoX = padding
+          logoY = img.height - logoHeight - padding
+          break
+        case 'bottom-right':
+          logoX = img.width - logoWidth - padding
+          logoY = img.height - logoHeight - padding
+          break
+        case 'center':
+          logoX = (img.width - logoWidth) / 2
+          logoY = (img.height - logoHeight) / 2
+          break
+        default: // top-left
+          logoX = padding
+          logoY = padding
+      }
+      
+      // Draw logo with opacity
+      ctx.globalAlpha = watermark.opacity
+      ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight)
+      ctx.globalAlpha = 1
+      
+      // Update source image
+      const newImageUrl = canvas.toDataURL('image/png')
+      setSourceImage(newImageUrl)
+      
+    } catch (err) {
+      console.error('Error applying logo:', err)
+      alert('Chyba při aplikování loga')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  // ============================================================================
   // GENERATE CREATIVES
   // ============================================================================
 
@@ -355,6 +554,22 @@ export default function App() {
         const srcRatio = img.width / img.height
         const tgtRatio = fmt.width / fmt.height
         
+        // Aplikuj ruční offset (v procentech, -50 až +50)
+        const applyOffset = (crop: typeof cropResult) => {
+          // Offset v pixelech - proporcionálně k velikosti cropu
+          const maxOffsetX = (img.width - crop.width) / 2
+          const maxOffsetY = (img.height - crop.height) / 2
+          
+          const offsetX = (imageOffset.x / 50) * maxOffsetX
+          const offsetY = (imageOffset.y / 50) * maxOffsetY
+          
+          return {
+            ...crop,
+            x: Math.max(0, Math.min(img.width - crop.width, crop.x - offsetX)),
+            y: Math.max(0, Math.min(img.height - crop.height, crop.y - offsetY)),
+          }
+        }
+        
         if (cropMode === 'fit') {
           // FIT režim: zachovat celý obrázek, přidat padding pokud potřeba
           // Obrázek se vejde celý do canvasu (letterbox/pillarbox efekt)
@@ -379,12 +594,17 @@ export default function App() {
           ctx.fillStyle = currentBrandKit?.backgroundColor || '#ffffff'
           ctx.fillRect(0, 0, fmt.width, fmt.height)
           
+          // Aplikuj offset na pozici v FIT režimu
+          const fitOffsetX = (imageOffset.x / 50) * ((fmt.width - drawWidth) / 2)
+          const fitOffsetY = (imageOffset.y / 50) * ((fmt.height - drawHeight) / 2)
+          
           // Nakresli obrázek zachovaný celý
-          ctx.drawImage(img, 0, 0, img.width, img.height, drawX, drawY, drawWidth, drawHeight)
+          ctx.drawImage(img, 0, 0, img.width, img.height, drawX + fitOffsetX, drawY + fitOffsetY, drawWidth, drawHeight)
         } else if (catType === 'image' && cropMode === 'smart') {
           // SMART režim: inteligentní ořez
           try {
             cropResult = await calculateSmartCrop(sourceImage, fmt.width, fmt.height, { minScale: 0.5 })
+            cropResult = applyOffset(cropResult)
           } catch {
             // Fallback na základní crop
             if (srcRatio > tgtRatio) {
@@ -394,6 +614,7 @@ export default function App() {
               const newH = img.width / tgtRatio
               cropResult = { x: 0, y: (img.height - newH) / 2, width: img.width, height: newH }
             }
+            cropResult = applyOffset(cropResult)
           }
           ctx.drawImage(
             img,
@@ -409,6 +630,7 @@ export default function App() {
             const newH = img.width / tgtRatio
             cropResult = { x: 0, y: (img.height - newH) / 2, width: img.width, height: newH }
           }
+          cropResult = applyOffset(cropResult)
           ctx.drawImage(
             img,
             cropResult.x, cropResult.y, cropResult.width, cropResult.height,
@@ -749,19 +971,37 @@ export default function App() {
                   </p>
                 </div>
               )}
+              
+              {/* Image Position Control */}
+              {sourceImage && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <ImagePositionControl />
+                </div>
+              )}
             </div>
 
             {/* Conditional editors based on category type */}
             {categoryType === 'image' && (
               <>
-                <TextOverlayEditor onGenerateAI={generateAIText} isGenerating={isGenerating} />
-                <WatermarkEditor />
+                <TextOverlayEditor 
+                  onGenerateAI={generateAIText} 
+                  onApplyToImage={applyTextToSourceImage}
+                  isGenerating={isGenerating} 
+                />
+                <WatermarkEditor 
+                  onApplyToImage={applyLogoToSourceImage}
+                  isGenerating={isGenerating}
+                />
               </>
             )}
 
             {categoryType === 'branding' && (
               <>
-                <TextOverlayEditor onGenerateAI={generateAIText} isGenerating={isGenerating} />
+                <TextOverlayEditor 
+                  onGenerateAI={generateAIText} 
+                  onApplyToImage={applyTextToSourceImage}
+                  isGenerating={isGenerating} 
+                />
                 {/* Safe Zone info */}
                 <div className="p-4 border-b border-gray-100">
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">

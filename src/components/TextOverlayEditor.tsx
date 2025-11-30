@@ -5,10 +5,11 @@ import { cn } from '@/lib/utils'
 
 interface TextOverlayEditorProps {
   onGenerateAI: (field: 'headline' | 'subheadline') => Promise<void>
+  onApplyToImage: () => void
   isGenerating: boolean
 }
 
-export function TextOverlayEditor({ onGenerateAI, isGenerating }: TextOverlayEditorProps) {
+export function TextOverlayEditor({ onGenerateAI, onApplyToImage, isGenerating }: TextOverlayEditorProps) {
   const { textOverlay, setTextOverlay, textModelTier, setTextModelTier } = useAppStore()
 
   const positions = [
@@ -148,6 +149,21 @@ export function TextOverlayEditor({ onGenerateAI, isGenerating }: TextOverlayEdi
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Apply Button */}
+          <div className="pt-2 border-t border-border">
+            <Button
+              onClick={onApplyToImage}
+              disabled={isGenerating || (!textOverlay.headline && !textOverlay.subheadline && !textOverlay.cta)}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+            >
+              <Wand2 className="w-4 h-4 mr-2" />
+              Přidat text na obrázek
+            </Button>
+            <p className="text-[10px] text-muted-foreground mt-1 text-center">
+              Text se přidá na zdrojový obrázek
+            </p>
           </div>
         </div>
       )}

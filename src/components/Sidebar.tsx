@@ -34,7 +34,8 @@ const navigationItems = [
     id: 'quickmode' as const, 
     label: 'Quick Mode', 
     icon: Rocket,
-    badge: 'NEW',
+    badge: 'SOON',
+    disabled: true,
   },
   { 
     id: 'editor' as const, 
@@ -83,30 +84,43 @@ export function Sidebar({ currentView, onNavigate, onOpenSettings }: SidebarProp
           {navigationItems.map((item) => {
             const Icon = item.icon
             const isActive = currentView === item.id
+            const isDisabled = 'disabled' in item && item.disabled
             
             return (
               <button
                 key={item.id}
-                onClick={() => onNavigate(item.id)}
+                onClick={() => !isDisabled && onNavigate(item.id)}
+                disabled={isDisabled}
                 className={cn(
                   'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all',
-                  isActive 
-                    ? 'bg-blue-50 text-[#1a73e8]' 
-                    : 'text-gray-700 hover:bg-gray-50'
+                  isDisabled
+                    ? 'text-gray-400 cursor-not-allowed opacity-60'
+                    : isActive 
+                      ? 'bg-blue-50 text-[#1a73e8]' 
+                      : 'text-gray-700 hover:bg-gray-50'
                 )}
               >
                 <Icon className={cn(
                   'w-[18px] h-[18px] flex-shrink-0',
-                  isActive ? 'text-[#1a73e8]' : 'text-gray-500'
+                  isDisabled 
+                    ? 'text-gray-400'
+                    : isActive ? 'text-[#1a73e8]' : 'text-gray-500'
                 )} />
                 <span className={cn(
                   'text-[13px] font-medium flex-1',
-                  isActive ? 'text-[#1a73e8]' : 'text-gray-700'
+                  isDisabled 
+                    ? 'text-gray-400'
+                    : isActive ? 'text-[#1a73e8]' : 'text-gray-700'
                 )}>
                   {item.label}
                 </span>
                 {'badge' in item && item.badge && (
-                  <span className="text-[10px] font-bold bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-1.5 py-0.5 rounded">
+                  <span className={cn(
+                    'text-[10px] font-bold px-1.5 py-0.5 rounded',
+                    isDisabled
+                      ? 'bg-gray-200 text-gray-500'
+                      : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+                  )}>
                     {item.badge}
                   </span>
                 )}
@@ -115,7 +129,7 @@ export function Sidebar({ currentView, onNavigate, onOpenSettings }: SidebarProp
                     {creativesCount}
                   </span>
                 )}
-                {isActive && (
+                {isActive && !isDisabled && (
                   <ChevronRight className="w-4 h-4 text-[#1a73e8]" />
                 )}
               </button>

@@ -1,9 +1,14 @@
 import React, { useRef } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { Button, Switch } from '@/components/ui'
-import { Image, Upload, Trash2 } from 'lucide-react'
+import { Image, Upload, Trash2, Wand2 } from 'lucide-react'
 
-export function WatermarkEditor() {
+interface WatermarkEditorProps {
+  onApplyToImage?: () => void
+  isGenerating?: boolean
+}
+
+export function WatermarkEditor({ onApplyToImage, isGenerating }: WatermarkEditorProps = {}) {
   const { watermark, setWatermark } = useAppStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -125,6 +130,23 @@ export function WatermarkEditor() {
               />
             </div>
           </div>
+
+          {/* Apply Button */}
+          {onApplyToImage && (
+            <div className="pt-2 border-t border-border">
+              <Button
+                onClick={onApplyToImage}
+                disabled={isGenerating || !watermark.image}
+                className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white"
+              >
+                <Wand2 className="w-4 h-4 mr-2" />
+                Přidat logo na obrázek
+              </Button>
+              <p className="text-[10px] text-muted-foreground mt-1 text-center">
+                Logo se přidá na zdrojový obrázek
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
