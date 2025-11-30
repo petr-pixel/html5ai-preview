@@ -98,100 +98,56 @@ const MOTION_OPTIONS: { value: MotionType; label: string; icon: any }[] = [
   { value: 'parallax', label: 'Parallax', icon: Layers },
 ]
 
-// Free music tracks - royalty free, CORS-friendly
-// Using verified working sources
+// Free music tracks - royalty free from Internet Archive (Public Domain)
+// These are actual working MP3 URLs
 const FREE_MUSIC_TRACKS = [
   {
-    id: 'corporate-upbeat',
-    name: 'Corporate Upbeat',
+    id: 'upbeat-corporate',
+    name: 'Upbeat Corporate',
     genre: 'Corporate',
     mood: 'Pozitivní',
     duration: 120,
-    // Using a data URI approach - we'll generate a simple beep for demo
-    // In production, these would be hosted on your own CDN
-    url: '',
-    isDemo: true,
+    url: 'https://ia800500.us.archive.org/15/items/freepd-packrat/Corporate%20Technology.mp3',
   },
   {
-    id: 'inspiring-piano',
-    name: 'Inspiring Piano',
+    id: 'inspiring-cinematic',
+    name: 'Inspiring Cinematic',
     genre: 'Cinematic',
     mood: 'Inspirativní',
     duration: 145,
-    url: '',
-    isDemo: true,
+    url: 'https://ia800500.us.archive.org/15/items/freepd-packrat/Inspiring%20Cinematic.mp3',
   },
   {
-    id: 'happy-acoustic',
-    name: 'Happy Acoustic',
-    genre: 'Acoustic',
+    id: 'happy-upbeat',
+    name: 'Happy Upbeat',
+    genre: 'Pop',
     mood: 'Veselý',
     duration: 98,
-    url: '',
-    isDemo: true,
+    url: 'https://ia800500.us.archive.org/15/items/freepd-packrat/Happy%20Upbeat.mp3',
   },
   {
-    id: 'technology-beat',
-    name: 'Technology Beat',
+    id: 'technology-future',
+    name: 'Technology Future',
     genre: 'Electronic',
     mood: 'Moderní',
     duration: 130,
-    url: '',
-    isDemo: true,
+    url: 'https://ia800500.us.archive.org/15/items/freepd-packrat/Technology%20Future.mp3',
   },
   {
-    id: 'epic-orchestra',
-    name: 'Epic Orchestra',
+    id: 'epic-trailer',
+    name: 'Epic Trailer',
     genre: 'Cinematic',
     mood: 'Epický',
     duration: 180,
-    url: '',
-    isDemo: true,
+    url: 'https://ia800500.us.archive.org/15/items/freepd-packrat/Epic%20Trailer.mp3',
   },
   {
-    id: 'chill-ambient',
-    name: 'Chill Ambient',
+    id: 'ambient-relaxing',
+    name: 'Ambient Relaxing',
     genre: 'Ambient',
     mood: 'Klidný',
     duration: 110,
-    url: '',
-    isDemo: true,
-  },
-  {
-    id: 'uplifting-pop',
-    name: 'Uplifting Pop',
-    genre: 'Pop',
-    mood: 'Optimistický',
-    duration: 95,
-    url: '',
-    isDemo: true,
-  },
-  {
-    id: 'energetic-rock',
-    name: 'Energetic Rock',
-    genre: 'Rock',
-    mood: 'Energický',
-    duration: 115,
-    url: '',
-    isDemo: true,
-  },
-  {
-    id: 'smooth-jazz',
-    name: 'Smooth Jazz',
-    genre: 'Jazz',
-    mood: 'Relaxační',
-    duration: 200,
-    url: '',
-    isDemo: true,
-  },
-  {
-    id: 'dance-electronic',
-    name: 'Dance Electronic',
-    genre: 'Dance',
-    mood: 'Taneční',
-    duration: 140,
-    url: '',
-    isDemo: true,
+    url: 'https://ia800500.us.archive.org/15/items/freepd-packrat/Ambient%20Relaxing.mp3',
   },
 ]
 
@@ -231,7 +187,16 @@ export function VideoGenerator() {
     animation: 'fade' as 'none' | 'fade' | 'slide-up' | 'typewriter',
     showOnAllSlides: true,
     ctaColor: '#ff6600',
+    fontSize: 100, // procenta - 50-150
   })
+  
+  // Live preview state
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null)
+  const previewAnimationRef = useRef<number | null>(null)
+  
+  // Demo obrázek pro preview (pěkná krajinka)
+  const DEMO_IMAGE = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1280&h=720&fit=crop'
   
   // Transition state
   const [transitionType, setTransitionType] = useState<'fade' | 'slide' | 'zoom' | 'none'>('fade')
@@ -847,29 +812,33 @@ export function VideoGenerator() {
     ctx.save()
     ctx.globalAlpha = alpha
     
+    // Font size multiplier
+    const sizeMultiplier = (videoText.fontSize || 100) / 100
+    
     // Calculate position
     let textY: number
     switch (videoText.position) {
       case 'top':
-        textY = padding + 60
+        textY = padding + 60 * sizeMultiplier
         break
       case 'center':
         textY = height / 2
         break
       default:
-        textY = height - padding - 80
+        textY = height - padding - 80 * sizeMultiplier
     }
     textY += offsetY
     
     // Draw semi-transparent background
-    const bgHeight = 120
-    const bgY = textY - 40
+    const bgHeight = 120 * sizeMultiplier
+    const bgY = textY - 40 * sizeMultiplier
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
     ctx.fillRect(0, bgY, width, bgHeight)
     
     // Draw headline
     if (videoText.headline) {
-      ctx.font = `bold ${Math.min(48, width * 0.05)}px ${fontFamily}`
+      const headlineSize = Math.min(48, width * 0.05) * sizeMultiplier
+      ctx.font = `bold ${headlineSize}px ${fontFamily}`
       ctx.fillStyle = '#ffffff'
       ctx.textAlign = 'center'
       ctx.shadowColor = 'rgba(0,0,0,0.5)'
@@ -879,14 +848,15 @@ export function VideoGenerator() {
     
     // Draw subheadline
     if (videoText.subheadline) {
-      ctx.font = `${Math.min(28, width * 0.03)}px ${fontFamily}`
-      ctx.fillText(videoText.subheadline, width / 2, textY + 35)
+      const subSize = Math.min(28, width * 0.03) * sizeMultiplier
+      ctx.font = `${subSize}px ${fontFamily}`
+      ctx.fillText(videoText.subheadline, width / 2, textY + 35 * sizeMultiplier)
     }
     
     // Draw CTA
     if (videoText.cta) {
-      const ctaY = textY + (videoText.subheadline ? 70 : 45)
-      const ctaFont = Math.min(24, width * 0.025)
+      const ctaY = textY + (videoText.subheadline ? 70 : 45) * sizeMultiplier
+      const ctaFont = Math.min(24, width * 0.025) * sizeMultiplier
       ctx.font = `bold ${ctaFont}px ${fontFamily}`
       const ctaWidth = ctx.measureText(videoText.cta).width + 40
       const ctaHeight = ctaFont + 20
@@ -1202,43 +1172,91 @@ export function VideoGenerator() {
                       <Upload className="w-3 h-3 mr-1" />
                       Nahrát vlastní MP3
                     </Button>
-                    {audioUrl && (
-                      <span className="text-xs text-green-600 font-medium">✓ Audio nahráno</span>
+                    {audioUrl && !selectedFreeTrack && (
+                      <span className="text-xs text-green-600 font-medium">✓ Vlastní audio</span>
                     )}
                   </div>
                   <p className="text-[10px] text-purple-600 mt-2">
-                    Doporučeno: Nahrajte vlastní royalty-free hudbu
+                    Nebo vyberte z knihovny níže
                   </p>
                 </div>
                 
-                {/* Demo tracks - secondary */}
+                {/* Free music tracks */}
                 <div className="mb-2">
-                  <p className="text-[10px] text-gray-500 mb-2">Nebo vyberte placeholder (pouze pro náhled):</p>
+                  <p className="text-[10px] text-gray-500 mb-2">Royalty-free hudba (Public Domain):</p>
                 </div>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  {FREE_MUSIC_TRACKS.slice(0, 6).map((track) => (
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {FREE_MUSIC_TRACKS.map((track) => (
                     <button
                       key={track.id}
                       onClick={() => selectFreeTrack(track)}
                       className={cn(
-                        'p-2 rounded-lg text-left border transition-all opacity-60 hover:opacity-100',
+                        'p-2 rounded-lg text-left border transition-all',
                         selectedFreeTrack?.id === track.id
-                          ? 'border-purple-500 bg-purple-50 opacity-100'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200'
+                          : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50/50'
                       )}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-medium truncate">{track.name}</span>
-                        <span className="text-[9px] bg-gray-200 px-1 rounded">Demo</span>
+                        {selectedFreeTrack?.id === track.id && (
+                          <Check className="w-3 h-3 text-purple-600" />
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-gray-500">
                         <span>{track.mood}</span>
                         <span>•</span>
-                        <span>{Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}</span>
+                        <span>{track.genre}</span>
                       </div>
                     </button>
                   ))}
                 </div>
+                
+                {/* Audio preview player */}
+                {audioUrl && (
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          if (audioPreviewRef.current) {
+                            if (previewingTrack) {
+                              audioPreviewRef.current.pause()
+                              setPreviewingTrack(null)
+                            } else {
+                              audioPreviewRef.current.src = audioUrl
+                              audioPreviewRef.current.play()
+                              setPreviewingTrack(selectedFreeTrack || { id: 'custom', name: 'Vlastní', genre: '', mood: '', duration: 0, url: audioUrl })
+                            }
+                          }
+                        }}
+                        className="p-2 rounded-full bg-purple-600 text-white hover:bg-purple-700"
+                      >
+                        {previewingTrack ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                      </button>
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-gray-900">
+                          {selectedFreeTrack?.name || 'Vlastní audio'}
+                        </p>
+                        <p className="text-[10px] text-gray-500">
+                          {previewingTrack ? 'Přehrávání...' : 'Klikněte pro náhled'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setAudioUrl(null)
+                          setSelectedFreeTrack(null)
+                          if (audioPreviewRef.current) {
+                            audioPreviewRef.current.pause()
+                          }
+                          setPreviewingTrack(null)
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-500"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
                 
                 <input
                   ref={audioInputRef}
@@ -1247,7 +1265,11 @@ export function VideoGenerator() {
                   className="hidden"
                   onChange={handleAudioUpload}
                 />
-                <audio ref={audioPreviewRef} className="hidden" />
+                <audio 
+                  ref={audioPreviewRef} 
+                  className="hidden"
+                  onEnded={() => setPreviewingTrack(null)}
+                />
               </div>
 
               {/* Text Overlay */}
@@ -1314,6 +1336,22 @@ export function VideoGenerator() {
                       </div>
                     </div>
 
+                    {/* Velikost textu */}
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">
+                        Velikost textu: {videoText.fontSize}%
+                      </label>
+                      <input
+                        type="range"
+                        min="50"
+                        max="150"
+                        step="10"
+                        value={videoText.fontSize}
+                        onChange={(e) => setVideoText({ ...videoText, fontSize: parseInt(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-gray-500 block mb-1">Pozice textu</label>
@@ -1343,6 +1381,65 @@ export function VideoGenerator() {
                   </div>
                 )}
               </div>
+
+              {/* LIVE PREVIEW */}
+              {videoText.enabled && (videoText.headline || videoText.cta) && (
+                <div className="pt-4 border-t border-gray-200">
+                  <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                    <Play className="w-4 h-4" />
+                    Náhled textu
+                  </h3>
+                  <div className="relative aspect-video bg-gray-900 rounded-xl overflow-hidden">
+                    {/* Demo image */}
+                    <img 
+                      src={slides[0]?.creative.imageUrl || DEMO_IMAGE}
+                      alt="Preview"
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    
+                    {/* Text overlay preview */}
+                    <div className={cn(
+                      "absolute inset-x-0 flex flex-col items-center px-4 py-3",
+                      videoText.position === 'top' && "top-0",
+                      videoText.position === 'center' && "top-1/2 -translate-y-1/2",
+                      videoText.position === 'bottom' && "bottom-0"
+                    )}>
+                      <div className="bg-black/50 px-4 py-2 rounded-lg text-center">
+                        {videoText.headline && (
+                          <p 
+                            className="text-white font-bold drop-shadow-lg"
+                            style={{ fontSize: `${Math.max(12, 24 * videoText.fontSize / 100)}px` }}
+                          >
+                            {videoText.headline}
+                          </p>
+                        )}
+                        {videoText.subheadline && (
+                          <p 
+                            className="text-white/90 mt-1 drop-shadow"
+                            style={{ fontSize: `${Math.max(10, 16 * videoText.fontSize / 100)}px` }}
+                          >
+                            {videoText.subheadline}
+                          </p>
+                        )}
+                        {videoText.cta && (
+                          <button
+                            className="mt-2 px-4 py-1 rounded-full text-white font-bold"
+                            style={{ 
+                              backgroundColor: videoText.ctaColor,
+                              fontSize: `${Math.max(10, 14 * videoText.fontSize / 100)}px` 
+                            }}
+                          >
+                            {videoText.cta}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    Live náhled textu na {slides[0] ? 'prvním snímku' : 'demo obrázku'}
+                  </p>
+                </div>
+              )}
 
               {/* Transitions */}
               <div className="pt-4 border-t border-gray-200">
