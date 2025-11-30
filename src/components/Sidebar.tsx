@@ -1,85 +1,139 @@
+/**
+ * Sidebar - Hlavní navigace ve stylu Google Ads
+ */
+
 import { useAppStore } from '@/stores/app-store'
-import { platforms } from '@/lib/platforms'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui'
-import { Settings, Sparkles } from 'lucide-react'
-import type { PlatformId } from '@/types'
+import { 
+  LayoutDashboard, 
+  Sparkles, 
+  Video, 
+  Palette, 
+  FolderOpen, 
+  Settings,
+  ChevronRight,
+  Zap
+} from 'lucide-react'
+
+export type NavigationView = 'dashboard' | 'editor' | 'video' | 'brandkits' | 'library' | 'settings'
 
 interface SidebarProps {
+  currentView: NavigationView
+  onNavigate: (view: NavigationView) => void
   onOpenSettings: () => void
 }
 
-export function Sidebar({ onOpenSettings }: SidebarProps) {
-  const { platform, category, setPlatform, setCategory } = useAppStore()
-  const currentPlatform = platforms[platform]
+const navigationItems = [
+  { 
+    id: 'dashboard' as const, 
+    label: 'Dashboard', 
+    icon: LayoutDashboard,
+  },
+  { 
+    id: 'editor' as const, 
+    label: 'Tvorba kreativ', 
+    icon: Sparkles,
+  },
+  { 
+    id: 'video' as const, 
+    label: 'Video Studio', 
+    icon: Video,
+  },
+  { 
+    id: 'library' as const, 
+    label: 'Knihovna', 
+    icon: FolderOpen,
+  },
+  { 
+    id: 'brandkits' as const, 
+    label: 'Brand Kity', 
+    icon: Palette,
+  },
+]
+
+export function Sidebar({ currentView, onNavigate, onOpenSettings }: SidebarProps) {
+  const { creatives } = useAppStore()
+  const creativesCount = Object.keys(creatives).length
 
   return (
-    <aside className="sidebar">
+    <aside className="w-60 bg-white border-r border-gray-200 flex flex-col h-screen">
       {/* Logo */}
-      <div className="p-6 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
+      <div className="h-14 px-4 flex items-center border-b border-gray-100">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-[#1a73e8] flex items-center justify-center">
+            <Zap className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold gradient-text">AdCreative</h1>
-            <p className="text-xs text-muted-foreground">Studio Pro</p>
+            <h1 className="text-sm font-semibold text-gray-900">AdCreative</h1>
+            <p className="text-[10px] text-gray-500 -mt-0.5">Studio</p>
           </div>
         </div>
       </div>
 
-      {/* Platform Switch */}
-      <div className="p-4 border-b border-border">
-        <div className="flex gap-2">
-          {Object.entries(platforms).map(([key, p]) => (
-            <button
-              key={key}
-              onClick={() => setPlatform(key as PlatformId)}
-              className={cn(
-                'flex-1 py-2.5 px-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2',
-                platform === key
-                  ? key === 'sklik'
-                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'bg-secondary text-muted-foreground border border-transparent hover:border-border'
-              )}
-            >
-              <span>{p.icon}</span>
-              <span>{p.name}</span>
-            </button>
-          ))}
+      {/* Navigation */}
+      <nav className="flex-1 py-3 px-2 overflow-y-auto">
+        <div className="space-y-0.5">
+          {navigationItems.map((item) => {
+            const Icon = item.icon
+            const isActive = currentView === item.id
+            
+            return (
+              <button
+                key={item.id}
+                onClick={() => onNavigate(item.id)}
+                className={cn(
+                  'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all',
+                  isActive 
+                    ? 'bg-blue-50 text-[#1a73e8]' 
+                    : 'text-gray-700 hover:bg-gray-50'
+                )}
+              >
+                <Icon className={cn(
+                  'w-[18px] h-[18px] flex-shrink-0',
+                  isActive ? 'text-[#1a73e8]' : 'text-gray-500'
+                )} />
+                <span className={cn(
+                  'text-[13px] font-medium flex-1',
+                  isActive ? 'text-[#1a73e8]' : 'text-gray-700'
+                )}>
+                  {item.label}
+                </span>
+                {item.id === 'library' && creativesCount > 0 && (
+                  <span className="text-[11px] font-medium bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                    {creativesCount}
+                  </span>
+                )}
+                {isActive && (
+                  <ChevronRight className="w-4 h-4 text-[#1a73e8]" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </nav>
+
+      {/* Stats */}
+      <div className="px-3 py-2 border-t border-gray-100">
+        <div className="bg-gray-50 rounded-lg p-2.5">
+          <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">
+            Vytvořeno
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-xl font-semibold text-gray-900">{creativesCount}</span>
+            <span className="text-xs text-gray-500">kreativ</span>
+          </div>
         </div>
       </div>
 
-      {/* Categories */}
-      <nav className="flex-1 overflow-y-auto p-3">
-        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
-          Formáty
-        </div>
-        {Object.entries(currentPlatform.categories).map(([key, cat]) => (
-          <button
-            key={key}
-            onClick={() => setCategory(key)}
-            className={cn('sidebar-item', category === key && 'active')}
-          >
-            <span className="text-lg">{cat.icon}</span>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm truncate">{cat.name}</div>
-              <div className="text-xs text-muted-foreground truncate">{cat.description}</div>
-            </div>
-            <span className="text-xs text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded">
-              {cat.formats.length}
-            </span>
-          </button>
-        ))}
-      </nav>
-
-      {/* Settings Button */}
-      <div className="p-4 border-t border-border">
-        <Button variant="secondary" className="w-full" onClick={onOpenSettings}>
-          <Settings className="w-4 h-4" />
-          API Nastavení
-        </Button>
+      {/* Settings */}
+      <div className="p-2 border-t border-gray-100">
+        <button 
+          onClick={onOpenSettings}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <Settings className="w-[18px] h-[18px]" />
+          <span className="text-[13px] font-medium">Nastavení</span>
+        </button>
       </div>
     </aside>
   )

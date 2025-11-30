@@ -13,6 +13,15 @@
 export type PlatformId = 'sklik' | 'google'
 
 /**
+ * Typ kategorie - určuje jaké editory zobrazit
+ * - image: Standardní bannery (Smart Crop, Text Overlay)
+ * - branding: Formáty se Safe Zone (bez Smart Crop)
+ * - video: Video formáty (Video Editor)
+ * - html5: HTML5 bannery
+ */
+export type CategoryType = 'image' | 'branding' | 'video' | 'html5'
+
+/**
  * Safe Zone definice pro bannery s ochrannou zónou
  * Jednotky jsou v pixelech
  */
@@ -59,6 +68,8 @@ export interface Category {
   description: string
   icon: string
   formats: Format[]
+  // TYP KATEGORIE - určuje jaké editory zobrazit
+  type: CategoryType
   // Maximální velikost souboru v kB
   maxSizeKB: number
   // Povolené typy souborů

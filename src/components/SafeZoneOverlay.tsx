@@ -5,21 +5,32 @@
  */
 
 import { useMemo } from 'react'
-import type { Format } from '@/types'
+import type { Format, SafeZone } from '@/types'
 import { AlertTriangle, Check } from 'lucide-react'
 
 interface SafeZoneOverlayProps {
-  format: Format
+  format?: Format
+  safeZone?: SafeZone
+  width?: number
+  height?: number
   showLabels?: boolean
   className?: string
 }
 
-export function SafeZoneOverlay({ format, showLabels = true, className = '' }: SafeZoneOverlayProps) {
-  const styles = useMemo(() => {
-    if (!format.safeZone) return null
+export function SafeZoneOverlay({ 
+  format, 
+  safeZone: propSafeZone,
+  width: propWidth,
+  height: propHeight,
+  showLabels = false, 
+  className = '' 
+}: SafeZoneOverlayProps) {
+  const safeZone = propSafeZone || format?.safeZone
+  const width = propWidth || format?.width || 100
+  const height = propHeight || format?.height || 100
 
-    const { safeZone } = format
-    const { width, height } = format
+  const styles = useMemo(() => {
+    if (!safeZone) return null
 
     // Procenta pro CSS
     const topPct = (safeZone.top / height) * 100
@@ -28,91 +39,66 @@ export function SafeZoneOverlay({ format, showLabels = true, className = '' }: S
     const rightPct = (safeZone.right / width) * 100
 
     return { topPct, bottomPct, leftPct, rightPct }
-  }, [format])
+  }, [safeZone, width, height])
 
   if (!styles) return null
 
   const { topPct, bottomPct, leftPct, rightPct } = styles
 
+  // Pro Branding - střed je mrtvá zóna (červená)
+  const hasCenterDeadZone = safeZone?.centerWidth && leftPct > 0 && rightPct > 0
+
   return (
     <div className={`absolute inset-0 pointer-events-none ${className}`}>
-      {/* Top danger zone */}
-      {topPct > 0 && (
+      {hasCenterDeadZone ? (
+        // Branding style - střed je červený (mrtvá zóna)
         <div
-          className="absolute left-0 right-0 top-0 bg-red-500/30"
-          style={{ height: `${topPct}%` }}
+          className="absolute bg-red-500/40 border-2 border-dashed border-red-500"
+          style={{
+            top: `${topPct}%`,
+            left: `${leftPct}%`,
+            right: `${rightPct}%`,
+            bottom: `${bottomPct}%`,
+          }}
         >
-          {showLabels && topPct > 15 && (
+          {showLabels && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-red-700 text-xs font-medium bg-red-100/80 px-2 py-0.5 rounded flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                Pouze pozadí
+              <span className="text-red-700 text-[10px] font-bold bg-white/90 px-1.5 py-0.5 rounded">
+                MRTVÁ ZÓNA
               </span>
             </div>
           )}
         </div>
-      )}
-
-      {/* Bottom danger zone */}
-      {bottomPct > 0 && (
-        <div
-          className="absolute left-0 right-0 bottom-0 bg-red-500/30"
-          style={{ height: `${bottomPct}%` }}
-        >
-          {showLabels && bottomPct > 15 && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-red-700 text-xs font-medium bg-red-100/80 px-2 py-0.5 rounded flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                Pouze pozadí
-              </span>
-            </div>
+      ) : (
+        <>
+          {/* Top danger zone */}
+          {topPct > 0 && (
+            <div
+              className="absolute left-0 right-0 top-0 bg-red-500/30"
+              style={{ height: `${topPct}%` }}
+            />
           )}
-        </div>
-      )}
 
-      {/* Left danger zone */}
-      {leftPct > 0 && (
-        <div
-          className="absolute left-0 bg-red-500/30"
-          style={{ 
-            top: `${topPct}%`, 
-            width: `${leftPct}%`,
-            height: `${100 - topPct - bottomPct}%`
-          }}
-        />
-      )}
+          {/* Bottom danger zone */}
+          {bottomPct > 0 && (
+            <div
+              className="absolute left-0 right-0 bottom-0 bg-red-500/30"
+              style={{ height: `${bottomPct}%` }}
+            />
+          )}
 
-      {/* Right danger zone */}
-      {rightPct > 0 && (
-        <div
-          className="absolute right-0 bg-red-500/30"
-          style={{ 
-            top: `${topPct}%`, 
-            width: `${rightPct}%`,
-            height: `${100 - topPct - bottomPct}%`
-          }}
-        />
+          {/* Safe zone border */}
+          <div
+            className="absolute border-2 border-dashed border-green-500"
+            style={{
+              top: `${topPct}%`,
+              left: `${leftPct}%`,
+              right: `${rightPct}%`,
+              bottom: `${bottomPct}%`,
+            }}
+          />
+        </>
       )}
-
-      {/* Safe zone border */}
-      <div
-        className="absolute border-2 border-dashed border-green-500"
-        style={{
-          top: `${topPct}%`,
-          left: `${leftPct}%`,
-          right: `${rightPct}%`,
-          bottom: `${bottomPct}%`,
-        }}
-      >
-        {showLabels && (
-          <div className="absolute top-2 left-2">
-            <span className="text-green-700 text-xs font-medium bg-green-100/80 px-2 py-0.5 rounded flex items-center gap-1">
-              <Check className="w-3 h-3" />
-              Safe zone
-            </span>
-          </div>
-        )}
-      </div>
     </div>
   )
 }

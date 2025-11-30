@@ -2,6 +2,7 @@
  * BrandKitManager - Správa Brand Kitů
  * 
  * Umožňuje vytvářet, upravovat a aplikovat Brand Kity na kreativy.
+ * Automatická extrakce barev z loga pomocí ColorThief.
  */
 
 import { useState, useRef } from 'react'
@@ -17,25 +18,107 @@ import {
   Plus, 
   Image,
   Type,
-  Sparkles
+  Sparkles,
+  Wand2,
+  Loader2
 } from 'lucide-react'
+
+// @ts-expect-error - colorthief nemá typy
+import ColorThief from 'colorthief'
 
 interface BrandKitManagerProps {
   onApply?: (kit: BrandKit) => void
 }
 
+/**
+ * Extrahuje dominantní barvy z obrázku
+ */
+async function extractColorsFromImage(imageUrl: string): Promise<{
+  primary: string
+  secondary: string
+  palette: string[]
+}> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image()
+    img.crossOrigin = 'anonymous'
+    
+    img.onload = () => {
+      try {
+        const colorThief = new ColorThief()
+        
+        // Dominantní barva
+        const dominant = colorThief.getColor(img)
+        const primary = rgbToHex(dominant[0], dominant[1], dominant[2])
+        
+        // Paleta barev (5 barev)
+        const paletteRgb = colorThief.getPalette(img, 5)
+        const palette = paletteRgb.map((rgb: number[]) => 
+          rgbToHex(rgb[0], rgb[1], rgb[2])
+        )
+        
+        // Sekundární barva - první z palety co není podobná primární
+        let secondary = palette[1] || primary
+        for (const color of palette) {
+          if (!isSimilarColor(color, primary)) {
+            secondary = color
+            break
+          }
+        }
+        
+        resolve({ primary, secondary, palette })
+      } catch (err) {
+        reject(err)
+      }
+    }
+    
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = imageUrl
+  })
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map(x => {
+    const hex = x.toString(16)
+    return hex.length === 1 ? '0' + hex : hex
+  }).join('')
+}
+
+function isSimilarColor(color1: string, color2: string, threshold = 50): boolean {
+  const rgb1 = hexToRgb(color1)
+  const rgb2 = hexToRgb(color2)
+  if (!rgb1 || !rgb2) return false
+  
+  const diff = Math.sqrt(
+    Math.pow(rgb1.r - rgb2.r, 2) +
+    Math.pow(rgb1.g - rgb2.g, 2) +
+    Math.pow(rgb1.b - rgb2.b, 2)
+  )
+  
+  return diff < threshold
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null
+}
+
 export function BrandKitManager({ onApply }: BrandKitManagerProps) {
   const { brandKits, activeBrandKit, addBrandKit, setBrandKits, setActiveBrandKit } = useAppStore()
   const [isCreating, setIsCreating] = useState(false)
+  const [isExtractingColors, setIsExtractingColors] = useState(false)
   
   const squareLogoRef = useRef<HTMLInputElement>(null)
   const horizontalLogoRef = useRef<HTMLInputElement>(null)
 
   const [newKit, setNewKit] = useState<Partial<BrandKit>>({
     name: '',
-    primaryColor: '#f97316',
-    secondaryColor: '#3b82f6',
-    ctaColor: '#22c55e',
+    primaryColor: '#1a73e8',
+    secondaryColor: '#34a853',
+    ctaColor: '#1a73e8',
     textColor: '#ffffff',
     backgroundColor: '#000000',
   })
@@ -48,9 +131,9 @@ export function BrandKitManager({ onApply }: BrandKitManagerProps) {
       name: newKit.name,
       logoSquare: newKit.logoSquare,
       logoHorizontal: newKit.logoHorizontal,
-      primaryColor: newKit.primaryColor || '#f97316',
-      secondaryColor: newKit.secondaryColor || '#3b82f6',
-      ctaColor: newKit.ctaColor || '#22c55e',
+      primaryColor: newKit.primaryColor || '#1a73e8',
+      secondaryColor: newKit.secondaryColor || '#34a853',
+      ctaColor: newKit.ctaColor || '#1a73e8',
       textColor: newKit.textColor || '#ffffff',
       backgroundColor: newKit.backgroundColor || '#000000',
       headlineFont: newKit.headlineFont,
@@ -63,9 +146,9 @@ export function BrandKitManager({ onApply }: BrandKitManagerProps) {
     setIsCreating(false)
     setNewKit({
       name: '',
-      primaryColor: '#f97316',
-      secondaryColor: '#3b82f6',
-      ctaColor: '#22c55e',
+      primaryColor: '#1a73e8',
+      secondaryColor: '#34a853',
+      ctaColor: '#1a73e8',
       textColor: '#ffffff',
       backgroundColor: '#000000',
     })
@@ -83,14 +166,32 @@ export function BrandKitManager({ onApply }: BrandKitManagerProps) {
     onApply?.(kit)
   }
 
-  const handleLogoUpload = (type: 'square' | 'horizontal', file: File) => {
+  const handleLogoUpload = async (type: 'square' | 'horizontal', file: File) => {
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const dataUrl = e.target?.result as string
+      
+      // Ulož logo
       if (type === 'square') {
         setNewKit(prev => ({ ...prev, logoSquare: dataUrl }))
       } else {
         setNewKit(prev => ({ ...prev, logoHorizontal: dataUrl }))
+      }
+      
+      // Automaticky extrahuj barvy z loga
+      setIsExtractingColors(true)
+      try {
+        const colors = await extractColorsFromImage(dataUrl)
+        setNewKit(prev => ({
+          ...prev,
+          primaryColor: colors.primary,
+          secondaryColor: colors.secondary,
+          ctaColor: colors.primary, // CTA = primární barva
+        }))
+      } catch (err) {
+        console.warn('Failed to extract colors:', err)
+      } finally {
+        setIsExtractingColors(false)
       }
     }
     reader.readAsDataURL(file)

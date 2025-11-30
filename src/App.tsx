@@ -1,55 +1,50 @@
+/**
+ * AdCreative Studio - Main Application
+ * 
+ * Architektura:
+ * - Levý Sidebar s navigací
+ * - Kontextový editor podle typu kategorie (image/branding/video)
+ * - Google Ads Light Style
+ */
+
 import React, { useState, useRef } from 'react'
 import { useAppStore } from '@/stores/app-store'
-import { platforms, getFormatKey, parseFormatKey } from '@/lib/platforms'
+import { platforms, getFormatKey, getCategoryType, isBrandingCategory, isVideoCategory, getMaxSizeKB } from '@/lib/platforms'
 import { generateId, cn, loadImage } from '@/lib/utils'
-import { Sidebar } from '@/components/Sidebar'
+import { Sidebar, NavigationView } from '@/components/Sidebar'
 import { SettingsModal } from '@/components/SettingsModal'
 import { FormatCard } from '@/components/FormatCard'
 import { TextOverlayEditor } from '@/components/TextOverlayEditor'
 import { WatermarkEditor } from '@/components/WatermarkEditor'
 import { QRCodeEditor } from '@/components/QRCodeEditor'
-import { ABTestingEditor } from '@/components/ABTestingEditor'
-import { HTML5Preview } from '@/components/HTML5Preview'
-import { HistoryPanel } from '@/components/HistoryPanel'
-import { VideoScenarioEditor } from '@/components/VideoScenarioEditor'
-import { FormatSummaryBar } from '@/components/FormatSummaryBar'
-import { SourceVariantsPanel } from '@/components/SourceVariantsPanel'
 import { GalleryView } from '@/components/GalleryView'
-import { QualityCheck } from '@/components/QualityCheck'
-import { CostEstimator } from '@/components/CostEstimator'
 import { BrandKitManager } from '@/components/BrandKitManager'
 import { VideoGenerator } from '@/components/VideoGenerator'
-import { SafeZoneInfo } from '@/components/SafeZoneOverlay'
+import { SafeZoneOverlay } from '@/components/SafeZoneOverlay'
 import { downloadBlob, createCreativePackZip } from '@/lib/export'
-import {
-  Button,
-  Textarea,
-  Card,
-  Progress,
-  Badge,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-  Spinner,
-} from '@/components/ui'
+import { calculateSmartCrop } from '@/lib/smart-crop'
+import { Button, Progress, Spinner } from '@/components/ui'
 import {
   Sparkles,
   Upload,
-  Zap,
   Download,
-  Image,
-  Layers,
-  History,
   Check,
-  Play,
-  Grid3X3,
-  Video,
+  Image as ImageIcon,
+  AlertTriangle,
+  ChevronDown,
+  Wand2,
+  LayoutGrid,
+  ArrowRight,
 } from 'lucide-react'
-import type { Creative, TextOverlay } from '@/types'
+import type { Creative, TextOverlay, PlatformId, CategoryType } from '@/types'
 
-// Main App Component
+// ============================================================================
+// MAIN APP
+// ============================================================================
+
 export default function App() {
+  // Navigation state
+  const [currentView, setCurrentView] = useState<NavigationView>('editor')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -67,13 +62,13 @@ export default function App() {
     qrCode,
     isGenerating,
     progress,
-    activeView,
     apiKeys,
     imageModelTier,
     textModelTier,
     brandKits,
     activeBrandKit,
-    setImageModelTier,
+    setPlatform,
+    setCategory,
     setPrompt,
     setSourceFormat,
     setSourceImage,
@@ -86,18 +81,22 @@ export default function App() {
     addToHistory,
     setIsGenerating,
     setProgress,
-    setActiveView,
   } = useAppStore()
 
-  // Aktivní Brand Kit
+  // Derived state
+  const currentPlatform = platforms[platform]
+  const currentCategory = currentPlatform?.categories[category]
+  const categoryType = getCategoryType(platform, category)
+  const maxSizeKB = getMaxSizeKB(platform, category)
+  
   const currentBrandKit = activeBrandKit 
     ? brandKits.find(kit => kit.id === activeBrandKit) 
     : brandKits.find(kit => kit.isDefault)
 
-  const currentPlatform = platforms[platform]
-  const currentCategory = currentPlatform.categories[category]
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
 
-  // File upload handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -107,8 +106,6 @@ export default function App() {
     }
   }
 
-
-  // Generate source image with AI (OpenAI Images API)
   const generateSourceImage = async () => {
     if (!prompt.trim()) {
       alert('Zadejte prompt')
@@ -123,12 +120,9 @@ export default function App() {
     setProgress(10)
 
     try {
-      const size =
-        sourceFormat === 'landscape'
-          ? '1280x720'
-          : sourceFormat === 'portrait'
-          ? '864x1080'
-          : '1024x1024'
+      const size = sourceFormat === 'landscape' ? '1536x1024' 
+                 : sourceFormat === 'portrait' ? '1024x1536' 
+                 : '1024x1024'
 
       const quality = imageModelTier === 'best' ? 'hd' : 'standard'
 
@@ -140,13 +134,7 @@ export default function App() {
         },
         body: JSON.stringify({
           model: 'gpt-image-1',
-          prompt: `Professional advertising image for display / social ads. ${prompt}. Style: ${
-            sourceFormat === 'landscape'
-              ? 'landscape 16:9'
-              : sourceFormat === 'portrait'
-              ? 'portrait 4:5'
-              : 'square 1:1'
-          }. Clean composition, high contrast, room for text overlay, no logo baked in.`,
+          prompt: `Professional advertising image. ${prompt}. Clean composition, high contrast, room for text overlay.`,
           size,
           quality,
           n: 1,
@@ -167,57 +155,48 @@ export default function App() {
       throw new Error('No image')
     } catch (err) {
       console.error(err)
-      // Create demo image
-      const canvas = document.createElement('canvas')
-      const w = 1200
-      const h =
-        sourceFormat === 'landscape' ? 675 : sourceFormat === 'portrait' ? 1500 : 1200
-      canvas.width = w
-      canvas.height = h
-      const ctx = canvas.getContext('2d')!
-
-      const grad = ctx.createLinearGradient(0, 0, w, h)
-      grad.addColorStop(0, '#1e1b4b')
-      grad.addColorStop(0.5, '#312e81')
-      grad.addColorStop(1, '#1e1b4b')
-      ctx.fillStyle = grad
-      ctx.fillRect(0, 0, w, h)
-
-      ctx.fillStyle = '#fff'
-      ctx.font = 'bold 52px Inter, system-ui, sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText(prompt.slice(0, 35) + (prompt.length > 35 ? '...' : ''), w / 2, h / 2)
-
-      ctx.font = '24px Inter, system-ui, sans-serif'
-      ctx.fillStyle = '#a1a1aa'
-      ctx.fillText('Demo — připojte OpenAI API', w / 2, h / 2 + 50)
-
-      setSourceImage(canvas.toDataURL('image/png'))
-      setProgress(100)
+      createDemoImage()
     } finally {
       setIsGenerating(false)
     }
   }
 
-  // Generate AI text (OpenAI Chat Completions)
+  const createDemoImage = () => {
+    const canvas = document.createElement('canvas')
+    const w = 1200
+    const h = sourceFormat === 'landscape' ? 628 : sourceFormat === 'portrait' ? 1500 : 1200
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')!
+
+    const grad = ctx.createLinearGradient(0, 0, w, h)
+    grad.addColorStop(0, '#1a73e8')
+    grad.addColorStop(1, '#0d47a1')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, w, h)
+
+    ctx.fillStyle = '#fff'
+    ctx.font = 'bold 48px system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(prompt.slice(0, 30) + (prompt.length > 30 ? '...' : ''), w / 2, h / 2)
+
+    ctx.font = '20px system-ui, sans-serif'
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'
+    ctx.fillText('Demo – připojte OpenAI API', w / 2, h / 2 + 45)
+
+    setSourceImage(canvas.toDataURL('image/png'))
+    setProgress(100)
+  }
+
   const generateAIText = async (field: 'headline' | 'subheadline') => {
     if (!apiKeys.openai) {
       setSettingsOpen(true)
       return
     }
-    if (!prompt.trim()) {
-      alert('Nejprve zadejte prompt')
-      return
-    }
 
     setIsGenerating(true)
     try {
-      const model =
-        textModelTier === 'cheap'
-          ? 'gpt-4.1-mini'
-          : textModelTier === 'standard'
-          ? 'gpt-4.1'
-          : 'o3-mini'
+      const model = textModelTier === 'cheap' ? 'gpt-4o-mini' : 'gpt-4o'
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -232,159 +211,28 @@ export default function App() {
               role: 'user',
               content: `Napiš ${
                 field === 'headline' ? 'krátký reklamní headline (max 5 slov)' : 'krátký podtitulek (max 8 slov)'
-              } pro display / video reklamu na téma: "${prompt}". Pouze text, žádné uvozovky.`,
+              } pro reklamu: "${prompt}". Pouze text, žádné uvozovky.`,
             },
           ],
         }),
       })
       const data = await res.json()
-      const text =
-        data.choices?.[0]?.message?.content?.trim() ||
-        (field === 'headline' ? 'Speciální nabídka' : 'Jen teď')
+      const text = data.choices?.[0]?.message?.content?.trim() || (field === 'headline' ? 'Speciální nabídka' : 'Jen teď')
       setTextOverlay({ [field]: text })
-    } catch (err) {
-      console.error(err)
+    } catch {
       setTextOverlay({ [field]: field === 'headline' ? 'Speciální nabídka' : 'Pouze dnes' })
     } finally {
       setIsGenerating(false)
     }
   }
 
-  // Draw text overlay s Brand Kit podporou
-  const drawTextOverlayWithBrandKit = (
-    ctx: CanvasRenderingContext2D, 
-    canvas: HTMLCanvasElement, 
-    overlay: typeof textOverlay,
-    brandKit?: typeof currentBrandKit
-  ) => {
-    if (!overlay.enabled) return
+  // ============================================================================
+  // GENERATE CREATIVES
+  // ============================================================================
 
-    const scale = Math.min(canvas.width, canvas.height) / 300
-
-    // Použij Brand Kit font pokud existuje
-    const fontFamily = brandKit?.headlineFont || 'system-ui, -apple-system, sans-serif'
-    const textColor = brandKit?.textColor || '#ffffff'
-    const bgColor = brandKit?.backgroundColor || 'rgba(0,0,0,0.7)'
-
-    // Pozice
-    let x = 20 * scale
-    let y = canvas.height - 40 * scale
-    const positions: Record<string, { x: number; y: number }> = {
-      'top-left': { x: 20 * scale, y: 40 * scale },
-      'top-right': { x: canvas.width - 20 * scale, y: 40 * scale },
-      'bottom-left': { x: 20 * scale, y: canvas.height - 40 * scale },
-      'bottom-right': { x: canvas.width - 20 * scale, y: canvas.height - 40 * scale },
-      'center': { x: canvas.width / 2, y: canvas.height / 2 },
-    }
-    const pos = positions[overlay.position] || positions['bottom-left']
-    x = pos.x
-    y = pos.y
-
-    ctx.textAlign = overlay.position.includes('right') ? 'right' : overlay.position === 'center' ? 'center' : 'left'
-
-    // Headline
-    if (overlay.headline) {
-      ctx.font = `bold ${16 * scale}px ${fontFamily}`
-      
-      // Text shadow/background
-      const metrics = ctx.measureText(overlay.headline)
-      const padding = 8 * scale
-      
-      ctx.fillStyle = bgColor
-      const rectX = overlay.position.includes('right') 
-        ? x - metrics.width - padding * 2 
-        : overlay.position === 'center' 
-          ? x - metrics.width / 2 - padding 
-          : x - padding
-      ctx.fillRect(rectX, y - 16 * scale - padding, metrics.width + padding * 2, 20 * scale + padding * 2)
-      
-      ctx.fillStyle = textColor
-      ctx.fillText(overlay.headline, x, y)
-    }
-
-    // CTA Button
-    if (overlay.cta) {
-      const ctaY = y + 30 * scale
-      const ctaColor = overlay.ctaColor || brandKit?.ctaColor || '#f97316'
-      const ctaW = 100 * scale
-      const ctaH = 28 * scale
-      const ctaX = overlay.position.includes('right') 
-        ? x - ctaW 
-        : overlay.position === 'center' 
-          ? x - ctaW / 2 
-          : x
-
-      // CTA background s zaoblenými rohy
-      ctx.fillStyle = ctaColor
-      const radius = 4 * scale
-      ctx.beginPath()
-      ctx.moveTo(ctaX + radius, ctaY)
-      ctx.lineTo(ctaX + ctaW - radius, ctaY)
-      ctx.quadraticCurveTo(ctaX + ctaW, ctaY, ctaX + ctaW, ctaY + radius)
-      ctx.lineTo(ctaX + ctaW, ctaY + ctaH - radius)
-      ctx.quadraticCurveTo(ctaX + ctaW, ctaY + ctaH, ctaX + ctaW - radius, ctaY + ctaH)
-      ctx.lineTo(ctaX + radius, ctaY + ctaH)
-      ctx.quadraticCurveTo(ctaX, ctaY + ctaH, ctaX, ctaY + ctaH - radius)
-      ctx.lineTo(ctaX, ctaY + radius)
-      ctx.quadraticCurveTo(ctaX, ctaY, ctaX + radius, ctaY)
-      ctx.closePath()
-      ctx.fill()
-
-      ctx.fillStyle = '#ffffff'
-      ctx.font = `bold ${12 * scale}px ${fontFamily}`
-      ctx.textAlign = 'center'
-      ctx.fillText(overlay.cta, ctaX + ctaW / 2, ctaY + 18 * scale)
-    }
-  }
-
-  // Draw watermark s Brand Kit podporou
-  const drawWatermarkWithBrandKit = async (
-    ctx: CanvasRenderingContext2D, 
-    canvas: HTMLCanvasElement, 
-    wm: typeof watermark
-  ) => {
-    if (!wm.enabled || !wm.image) return
-
-    try {
-      const img = await loadImage(wm.image)
-      const size = (wm.size / 100) * Math.min(canvas.width, canvas.height)
-      const aspectRatio = img.width / img.height
-      const w = size * aspectRatio
-      const h = size
-      const margin = 20
-
-      let x = margin
-      let y = margin
-
-      switch (wm.position) {
-        case 'top-right':
-          x = canvas.width - w - margin
-          break
-        case 'bottom-left':
-          y = canvas.height - h - margin
-          break
-        case 'bottom-right':
-          x = canvas.width - w - margin
-          y = canvas.height - h - margin
-          break
-        case 'center':
-          x = (canvas.width - w) / 2
-          y = (canvas.height - h) / 2
-          break
-      }
-
-      ctx.globalAlpha = wm.opacity
-      ctx.drawImage(img, x, y, w, h)
-      ctx.globalAlpha = 1
-    } catch (err) {
-      console.error('Watermark error:', err)
-    }
-  }
-
-  // Generate all creatives
   const generateCreatives = async () => {
     if (!sourceImage) {
-      alert('Nejprve vygenerujte nebo nahrajte obrázek')
+      alert('Nejprve nahrajte nebo vygenerujte zdrojový obrázek')
       return
     }
     if (selectedFormats.size === 0) {
@@ -393,606 +241,749 @@ export default function App() {
     }
 
     setIsGenerating(true)
-    const newCreatives: Creative[] = []
-    let done = 0
-
-    // ========================================
-    // BRAND KIT AUTOMATIZACE
-    // ========================================
-    
-    // Aplikuj Brand Kit pokud je aktivní
-    let effectiveTextOverlay = { ...textOverlay }
-    let effectiveWatermark = { ...watermark }
-    
-    if (currentBrandKit) {
-      // 1. Automaticky změň barvu CTA tlačítka
-      if (currentBrandKit.ctaColor) {
-        effectiveTextOverlay.ctaColor = currentBrandKit.ctaColor
-      }
-      
-      // 2. Automaticky aplikuj logo jako vodoznak
-      if (currentBrandKit.logoSquare || currentBrandKit.logoHorizontal) {
-        effectiveWatermark = {
-          ...effectiveWatermark,
-          enabled: true,
-          image: currentBrandKit.logoHorizontal || currentBrandKit.logoSquare || null,
-          opacity: 0.9,
-          size: 12,
-          position: 'bottom-right',
-        }
-      }
-      
-      // 3. Aktualizuj store s Brand Kit hodnotami (pro UI feedback)
-      setTextOverlay({ ctaColor: effectiveTextOverlay.ctaColor })
-      if (effectiveWatermark.image) {
-        setWatermark(effectiveWatermark)
-      }
-    }
-
-    const img = await loadImage(sourceImage)
-    
-    // Import smart crop pro pokročilý ořez
-    const { calculateSmartCrop } = await import('@/lib/smart-crop')
-
-    for (const key of selectedFormats) {
-      const { platform: plat, category: cat, index } = parseFormatKey(key)
-      const fmt = platforms[plat].categories[cat].formats[index]
-
-      const canvas = document.createElement('canvas')
-      canvas.width = fmt.width
-      canvas.height = fmt.height
-      const ctx = canvas.getContext('2d')!
-
-      // ========================================
-      // VYLEPŠENÝ SMART CROP
-      // ========================================
-      
-      let sx, sy, sw, sh
-      
-      try {
-        // Použij pokročilý smart crop s detekcí objektů
-        const cropResult = await calculateSmartCrop(
-          sourceImage,
-          fmt.width,
-          fmt.height,
-          { minScale: 0.5, centerBoost: 0.1 }
-        )
-        
-        sx = cropResult.x
-        sy = cropResult.y
-        sw = cropResult.width
-        sh = cropResult.height
-      } catch {
-        // Fallback na základní crop
-        const imgR = img.width / img.height
-        const tgtR = fmt.width / fmt.height
-
-        if (imgR > tgtR) {
-          sh = img.height
-          sw = img.height * tgtR
-          sx = (img.width - sw) / 2
-          sy = 0
-        } else {
-          sw = img.width
-          sh = img.width / tgtR
-          sx = 0
-          sy = (img.height - sh) / 2
-        }
-      }
-
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, fmt.width, fmt.height)
-
-      // Draw overlays s Brand Kit barvami
-      drawTextOverlayWithBrandKit(ctx, canvas, effectiveTextOverlay, currentBrandKit)
-      await drawWatermarkWithBrandKit(ctx, canvas, effectiveWatermark)
-
-      newCreatives.push({
-        id: generateId(),
-        formatKey: key,
-        platform: plat as 'sklik' | 'google',
-        category: cat,
-        format: fmt,
-        imageUrl: canvas.toDataURL('image/png', 0.92),
-        createdAt: new Date(),
-        variant: null,
-      })
-
-      done++
-      setProgress((done / selectedFormats.size) * 100)
-    }
-
-    addCreatives(newCreatives)
-    setIsGenerating(false)
-    setActiveView('preview')
-
-    // Add to history
-    addToHistory({
-      id: generateId(),
-      prompt,
-      sourceImage,
-      creatives: newCreatives,
-      textOverlay: effectiveTextOverlay,
-      watermark: effectiveWatermark,
-      qrCode,
-      createdAt: new Date(),
-      platform,
-    })
-  }
-
-  // Select all formats in current category
-  const handleSelectAll = () => {
-    const keys = currentCategory.formats.map((_, i) => getFormatKey(platform, category, i))
-    selectAllFormats(keys)
-  }
-
-  // Download all creatives as ZIP
-  const handleDownloadZip = async () => {
-    if (Object.keys(creatives).length === 0) return
-
-    setIsGenerating(true)
-    setProgress(10)
+    setProgress(0)
 
     try {
-      const staticContents: { format: any; blob: Blob; filename: string }[] = []
+      const formats = Array.from(selectedFormats)
+      const newCreatives: Creative[] = []
 
-      const creativesArray = Object.values(creatives) as Creative[]
-      let done = 0
+      // Load source image
+      const img = await loadImage(sourceImage)
 
-      for (const c of creativesArray) {
-        // Konvertovat data URL na Blob
-        const response = await fetch(c.imageUrl)
-        const blob = await response.blob()
+      for (let i = 0; i < formats.length; i++) {
+        const formatKey = formats[i]
+        const [plat, cat, indexStr] = formatKey.split('-')
+        const index = parseInt(indexStr, 10)
+        const fmt = platforms[plat]?.categories[cat]?.formats[index]
+
+        if (!fmt) continue
+
+        setProgress(Math.round(((i + 1) / formats.length) * 100))
+
+        // Create canvas
+        const canvas = document.createElement('canvas')
+        canvas.width = fmt.width
+        canvas.height = fmt.height
+        const ctx = canvas.getContext('2d')!
+
+        // Smart crop nebo základní crop
+        let cropResult = { x: 0, y: 0, width: img.width, height: img.height }
         
-        const filename = `${c.platform}_${c.category}_${c.format.width}x${c.format.height}.png`
-        staticContents.push({ format: c.format, blob, filename })
+        // Pro branding typ NEPOUŽÍVAT smart crop
+        const catType = getCategoryType(plat, cat)
+        if (catType === 'image') {
+          try {
+            cropResult = await calculateSmartCrop(sourceImage, fmt.width, fmt.height, { minScale: 0.5 })
+          } catch {
+            // Fallback na základní crop
+            const srcRatio = img.width / img.height
+            const tgtRatio = fmt.width / fmt.height
+            if (srcRatio > tgtRatio) {
+              const newW = img.height * tgtRatio
+              cropResult = { x: (img.width - newW) / 2, y: 0, width: newW, height: img.height }
+            } else {
+              const newH = img.width / tgtRatio
+              cropResult = { x: 0, y: (img.height - newH) / 2, width: img.width, height: newH }
+            }
+          }
+        } else {
+          // Pro branding - fit celý obrázek
+          const srcRatio = img.width / img.height
+          const tgtRatio = fmt.width / fmt.height
+          if (srcRatio > tgtRatio) {
+            const newW = img.height * tgtRatio
+            cropResult = { x: (img.width - newW) / 2, y: 0, width: newW, height: img.height }
+          } else {
+            const newH = img.width / tgtRatio
+            cropResult = { x: 0, y: (img.height - newH) / 2, width: img.width, height: newH }
+          }
+        }
 
-        done++
-        setProgress(10 + (done / creativesArray.length) * 80)
+        // Draw image
+        ctx.drawImage(
+          img,
+          cropResult.x, cropResult.y, cropResult.width, cropResult.height,
+          0, 0, fmt.width, fmt.height
+        )
+
+        // Draw text overlay
+        if (textOverlay.enabled) {
+          drawTextOverlay(ctx, textOverlay, fmt.width, fmt.height, currentBrandKit)
+        }
+
+        // Draw watermark (logo from Brand Kit)
+        if (watermark.enabled && watermark.image) {
+          await drawWatermark(ctx, watermark, fmt.width, fmt.height)
+        } else if (currentBrandKit?.logoSquare || currentBrandKit?.logoHorizontal) {
+          // Auto-apply brand kit logo
+          const logoUrl = currentBrandKit.logoHorizontal || currentBrandKit.logoSquare
+          if (logoUrl) {
+            await drawWatermark(ctx, {
+              enabled: true,
+              image: logoUrl,
+              opacity: 0.9,
+              size: 12,
+              position: 'bottom-right'
+            }, fmt.width, fmt.height)
+          }
+        }
+
+        const imageUrl = canvas.toDataURL('image/jpeg', 0.92)
+
+        newCreatives.push({
+          id: generateId(),
+          formatKey,
+          platform: plat as PlatformId,
+          category: cat,
+          format: fmt,
+          imageUrl,
+          createdAt: new Date(),
+          sizeKB: Math.round((imageUrl.length * 3) / 4 / 1024),
+        })
       }
 
-      const zipBlob = await createCreativePackZip(
-        { static: staticContents, html5: [], video: [] },
-        'brand',
-        prompt.slice(0, 20) || 'campaign'
-      )
+      addCreatives(newCreatives)
+
+      // Save to history
+      addToHistory({
+        id: generateId(),
+        prompt,
+        sourceImage,
+        creatives: newCreatives,
+        textOverlay,
+        watermark,
+        qrCode,
+        createdAt: new Date(),
+        platform,
+      })
 
       setProgress(100)
-      downloadBlob(zipBlob, `kreativy_${new Date().toISOString().slice(0, 10)}.zip`)
     } catch (err) {
-      console.error('ZIP export error:', err)
-      alert('Chyba při exportu ZIP')
+      console.error(err)
+      alert('Chyba při generování')
     } finally {
       setIsGenerating(false)
     }
   }
 
-  // Get selected count for current category
-  const selectedInCategory = [...selectedFormats].filter((k) =>
-    k.startsWith(`${platform}-${category}-`)
-  ).length
+  // ============================================================================
+  // EXPORT
+  // ============================================================================
 
-  return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
-      {/* Sidebar */}
-      <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
+  const handleExport = async () => {
+    const creativesArray = Object.values(creatives)
+    if (creativesArray.length === 0) {
+      alert('Žádné kreativy k exportu')
+      return
+    }
 
-      {/* Main Content */}
-      <main className="flex-1 lg:ml-72 p-4 lg:p-8">
-        {/* Tabs */}
-        <Tabs value={activeView} onValueChange={(v) => setActiveView(v as typeof activeView)}>
-          <TabsList className="mb-8">
-            <TabsTrigger value="create">
-              <Sparkles className="w-4 h-4" />
-              Vytvořit
-            </TabsTrigger>
-            <TabsTrigger value="preview">
-              <Layers className="w-4 h-4" />
-              Náhled
-              {Object.keys(creatives).length > 0 && (
-                <Badge variant="primary" className="ml-2">
-                  {Object.keys(creatives).length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="video">
-              <Video className="w-4 h-4" />
-              Video
-            </TabsTrigger>
-            <TabsTrigger value="gallery">
-              <Grid3X3 className="w-4 h-4" />
-              Galerie
-            </TabsTrigger>
-            <TabsTrigger value="history">
-              <History className="w-4 h-4" />
-              Historie
-            </TabsTrigger>
-          </TabsList>
+    setIsGenerating(true)
+    setProgress(0)
 
-          {/* Create Tab */}
-          <TabsContent value="create" className="space-y-6">
-            {/* Source Image Section */}
-            <Card className="p-6">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-6 h-6 text-white" />
+    try {
+      const zip = await createCreativePackZip(creativesArray, (p) => setProgress(p))
+      downloadBlob(zip, `adcreative-pack-${Date.now()}.zip`)
+    } catch (err) {
+      console.error(err)
+      alert('Chyba při exportu')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  // ============================================================================
+  // RENDER HELPERS
+  // ============================================================================
+
+  const renderDashboard = () => (
+    <div className="p-8">
+      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="card-google p-6">
+          <div className="text-sm text-gray-500 mb-1">Celkem kreativ</div>
+          <div className="text-3xl font-semibold text-gray-900">{Object.keys(creatives).length}</div>
+        </div>
+        <div className="card-google p-6">
+          <div className="text-sm text-gray-500 mb-1">Sklik</div>
+          <div className="text-3xl font-semibold text-gray-900">
+            {Object.values(creatives).filter(c => c.platform === 'sklik').length}
+          </div>
+        </div>
+        <div className="card-google p-6">
+          <div className="text-sm text-gray-500 mb-1">Google Ads</div>
+          <div className="text-3xl font-semibold text-gray-900">
+            {Object.values(creatives).filter(c => c.platform === 'google').length}
+          </div>
+        </div>
+      </div>
+
+      <div className="card-google p-6">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Rychlé akce</h2>
+        <div className="flex gap-3">
+          <button onClick={() => setCurrentView('editor')} className="btn-primary">
+            <Sparkles className="w-4 h-4" />
+            Nová kreativa
+          </button>
+          <button onClick={() => setCurrentView('video')} className="btn-secondary">
+            Vytvořit video
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderEditor = () => (
+    <div className="flex flex-1 overflow-hidden">
+      {/* Left Panel - Source & Settings */}
+      <div className="w-80 border-r border-gray-200 bg-white overflow-y-auto">
+        <div className="p-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">Platforma</h2>
+          <div className="flex gap-2">
+            {Object.entries(platforms).map(([key, p]) => (
+              <button
+                key={key}
+                onClick={() => {
+                  setPlatform(key as PlatformId)
+                  const firstCat = Object.keys(p.categories)[0]
+                  setCategory(firstCat)
+                }}
+                className={cn(
+                  'flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2',
+                  platform === key
+                    ? 'bg-blue-50 text-[#1a73e8] border border-[#1a73e8]'
+                    : 'bg-gray-50 text-gray-600 border border-gray-200 hover:border-gray-300'
+                )}
+              >
+                <span>{p.icon}</span>
+                <span>{p.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Category Selection */}
+        <div className="p-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">Kategorie</h2>
+          <div className="space-y-1">
+            {Object.entries(currentPlatform.categories).map(([key, cat]) => (
+              <button
+                key={key}
+                onClick={() => setCategory(key)}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all',
+                  category === key
+                    ? 'bg-blue-50 text-[#1a73e8]'
+                    : 'text-gray-600 hover:bg-gray-50'
+                )}
+              >
+                <span className="text-lg">{cat.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{cat.name}</div>
+                  <div className="text-xs text-gray-500 truncate">max {cat.maxSizeKB} kB</div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold">Zdrojový obrázek</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Vygenerujte AI obrázek nebo nahrajte vlastní
-                  </p>
-                </div>
-              </div>
+                {cat.type === 'branding' && (
+                  <span className="badge-yellow text-[10px]">Safe Zone</span>
+                )}
+                {cat.type === 'video' && (
+                  <span className="badge-blue text-[10px]">Video</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
 
-              <div className="grid lg:grid-cols-2 gap-6">
-                {/* Left: Controls */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Prompt
-                    </label>
-                    <Textarea
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      placeholder="Např. Lyžař na zasněžených horách při západu slunce..."
-                      className="h-28"
-                    />
-                  </div>
-
-                  <div className="flex gap-2">
-                    {(['landscape', 'square', 'portrait'] as const).map((fmt) => (
-                      <Button
-                        key={fmt}
-                        variant={sourceFormat === fmt ? 'primary' : 'secondary'}
-                        size="sm"
-                        onClick={() => setSourceFormat(fmt)}
-                        className="flex-1"
-                      >
-                        {fmt === 'landscape' ? '16:9' : fmt === 'square' ? '1:1' : '4:5'}
-                      </Button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 pt-2">
-                    <p className="text-xs text-muted-foreground">Model pro obrázek</p>
-                    <div className="inline-flex items-center rounded-full border border-border bg-background/60 p-1">
-                      {(['cheap', 'standard', 'best'] as const).map((tier) => (
-                        <button
-                          key={tier}
-                          type="button"
-                          onClick={() => setImageModelTier(tier)}
-                          className={cn(
-                            'px-2.5 py-1 rounded-full text-[11px] font-medium flex items-center gap-1 transition-all',
-                            imageModelTier === tier
-                              ? 'bg-primary text-primary-foreground shadow-sm'
-                              : 'text-muted-foreground hover:bg-muted'
-                          )}
-                        >
-                          <span>
-                            {tier === 'cheap' ? '💸' : tier === 'standard' ? '⚡' : '👑'}
-                          </span>
-                          <span>
-                            {tier === 'cheap'
-                              ? 'Levný'
-                              : tier === 'standard'
-                              ? 'Standard'
-                              : 'Nejlepší'}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground pt-1">
-                    Odhad ceny za obrázek (1024×1024): 💸 ~0,02 $ • ⚡ ~0,04 $ • 👑 ~0,08 $+
-                  </p>
-
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={generateSourceImage}
-                      disabled={isGenerating || !prompt.trim()}
-                      className="flex-1"
-                    >
-                      {isGenerating ? <Spinner size={18} /> : <Sparkles className="w-4 h-4" />}
-                      {isGenerating ? 'Generuji...' : 'Generovat AI'}
-                    </Button>
-                    <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
-                      <Upload className="w-4 h-4" />
-                      Nahrát
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleFileUpload}
-                    />
-                  </div>
-
-                  {/* Overlay Editors */}
-                  <div className="space-y-4 pt-4 border-t border-border">
-                    <TextOverlayEditor onGenerateAI={generateAIText} isGenerating={isGenerating} />
-                    <WatermarkEditor />
-                    <QRCodeEditor />
-                    <ABTestingEditor />
-                  </div>
-                </div>
-
-                {/* Right: Preview */}
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">
-                    Náhled
-                  </label>
-                  <div className="relative aspect-video bg-muted rounded-xl overflow-hidden border border-border">
-                    {sourceImage ? (
-                      <>
-                        <img
-                          src={sourceImage}
-                          alt="Preview"
-                          className="w-full h-full object-contain"
-                        />
-                        {textOverlay.enabled && (
-                          <div
-                            className={`absolute p-5 ${
-                              textOverlay.position.includes('bottom')
-                                ? 'bottom-0'
-                                : textOverlay.position.includes('top')
-                                ? 'top-0'
-                                : 'top-1/2 -translate-y-1/2'
-                            } ${
-                              textOverlay.position.includes('left')
-                                ? 'left-0 text-left'
-                                : textOverlay.position.includes('right')
-                                ? 'right-0 text-right'
-                                : 'left-1/2 -translate-x-1/2 text-center'
-                            }`}
-                          >
-                            {textOverlay.headline && (
-                              <div className="text-white font-bold text-xl drop-shadow-lg mb-1">
-                                {textOverlay.headline}
-                              </div>
-                            )}
-                            {textOverlay.subheadline && (
-                              <div className="text-white/90 text-sm drop-shadow-lg mb-2">
-                                {textOverlay.subheadline}
-                              </div>
-                            )}
-                            {textOverlay.cta && (
-                              <span
-                                className="inline-block px-4 py-2 rounded-lg text-white text-sm font-semibold"
-                                style={{ backgroundColor: textOverlay.ctaColor }}
-                              >
-                                {textOverlay.cta}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-                        <Image className="w-12 h-12" />
-                        <p className="mt-3 text-sm">Zadejte prompt nebo nahrajte obrázek</p>
-                      </div>
+        {/* Video redirect */}
+        {categoryType === 'video' ? (
+          <div className="p-4">
+            <div className="bg-blue-50 rounded-lg p-4 text-center">
+              <p className="text-sm text-gray-600 mb-3">
+                Pro tvorbu videí přejděte do Video Studia
+              </p>
+              <button onClick={() => setCurrentView('video')} className="btn-primary">
+                Video Studio
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Source Image */}
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3">Zdrojový obrázek</h2>
+              
+              {/* Format selection */}
+              <div className="flex gap-2 mb-3">
+                {(['landscape', 'square', 'portrait'] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    onClick={() => setSourceFormat(fmt)}
+                    className={cn(
+                      'flex-1 py-1.5 px-2 rounded text-xs font-medium transition-all',
+                      sourceFormat === fmt
+                        ? 'bg-[#1a73e8] text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     )}
-                  </div>
-
-                  {isGenerating && progress > 0 && (
-                    <div className="mt-3">
-                      <Progress value={progress} />
-                    </div>
-                  )}
-
-                  {/* Source Variants Panel */}
-                  <SourceVariantsPanel />
-                </div>
-              </div>
-
-              {/* Cost Estimator */}
-              <CostEstimator />
-            </Card>
-
-            {/* Video Scenario */}
-            <VideoScenarioEditor />
-
-            {/* Format Selection */}
-            <Card className="p-6">
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-start gap-4">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{
-                      background: `linear-gradient(135deg, ${currentPlatform.color}40, ${currentPlatform.color}20)`,
-                    }}
                   >
-                    <span className="text-2xl">{currentCategory.icon}</span>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-lg font-semibold">{currentCategory.name}</h2>
-                      <Badge
-                        variant="primary"
-                        style={{
-                          background: `${currentPlatform.color}20`,
-                          color: currentPlatform.color,
-                        }}
-                      >
-                        {currentPlatform.name}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{currentCategory.description}</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button variant="secondary" size="sm" onClick={handleSelectAll}>
-                    Vybrat vše
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={clearSelection}>
-                    Zrušit
-                  </Button>
-                </div>
-              </div>
-
-              <FormatSummaryBar className="mb-4" />
-
-              {/* Safe Zone Warning pro formáty s ochrannou zónou */}
-              {currentCategory.formats.some(f => f.safeZone) && (
-                <SafeZoneInfo format={currentCategory.formats.find(f => f.safeZone)!} />
-              )}
-
-              <div className="format-grid mt-4">
-                {currentCategory.formats.map((fmt, idx) => (
-                  <FormatCard
-                    key={idx}
-                    format={fmt}
-                    isSelected={selectedFormats.has(getFormatKey(platform, category, idx)) as boolean}
-                    onClick={() => toggleFormat(getFormatKey(platform, category, idx))}
-                    sourceImage={sourceImage as string | null}
-                    textOverlay={textOverlay as TextOverlay}
-                    maxSizeKB={currentCategory.maxSizeKB}
-                    fileTypes={currentCategory.fileTypes}
-                  />
+                    {fmt === 'landscape' ? '16:9' : fmt === 'square' ? '1:1' : '4:5'}
+                  </button>
                 ))}
               </div>
 
-              <div className="flex items-center justify-between mt-6 pt-6 border-t border-border">
-                <span className="text-sm text-muted-foreground">
-                  Vybráno: <strong className="text-foreground">{selectedInCategory}</strong> z{' '}
-                  {currentCategory.formats.length}
-                </span>
-                <Button
-                  onClick={generateCreatives}
-                  disabled={isGenerating || selectedFormats.size === 0 || !sourceImage}
+              {/* Prompt */}
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Popište obrázek pro AI generování..."
+                className="input-google mb-3 h-20 text-sm resize-none"
+              />
+
+              {/* Generate / Upload buttons */}
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={generateSourceImage}
+                  disabled={isGenerating}
+                  className="btn-primary flex-1 text-sm py-2"
                 >
-                  {isGenerating ? <Spinner size={18} /> : <Zap className="w-4 h-4" />}
-                  {isGenerating ? 'Generuji...' : 'Vytvořit kreativy'}
-                </Button>
-              </div>
-            </Card>
-          </TabsContent>
-
-          {/* Preview Tab */}
-          <TabsContent value="preview">
-            <Card className="p-6">
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0">
-                    <Check className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold">Vygenerované kreativy</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {Object.keys(creatives).length} formátů připraveno ke stažení
-                    </p>
-                  </div>
-                </div>
-
-                {Object.keys(creatives).length > 0 && (
-                  <Button 
-                    onClick={handleDownloadZip}
-                    disabled={isGenerating}
-                    className="bg-gradient-to-r from-emerald-500 to-teal-500"
-                  >
-                    {isGenerating ? <Spinner size={18} /> : <Download className="w-4 h-4" />}
-                    {isGenerating ? 'Exportuji...' : 'Stáhnout ZIP'}
-                  </Button>
-                )}
+                  {isGenerating ? <Spinner className="w-4 h-4" /> : <Wand2 className="w-4 h-4" />}
+                  Generovat
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="btn-secondary text-sm py-2"
+                >
+                  <Upload className="w-4 h-4" />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
               </div>
 
-              {Object.keys(creatives).length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-                    <Layers className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                  <h3 className="font-semibold text-lg mb-2">Zatím žádné kreativy</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Vyberte formáty a klikněte na "Vytvořit kreativy"
-                  </p>
+              {/* Source preview */}
+              {sourceImage && (
+                <div className="relative rounded-lg overflow-hidden border border-gray-200">
+                  <img src={sourceImage} alt="Source" className="w-full" />
                 </div>
-              ) : (
-                <>
-                  {/* Image creatives grid */}
-                  <div className="format-grid mb-8">
-                    {(Object.values(creatives) as Creative[]).map((c) => (
-                      <div key={c.id} className="bg-secondary rounded-xl overflow-hidden">
-                        <div className="aspect-video bg-background flex items-center justify-center">
-                          <img src={c.imageUrl} alt="" className="w-full h-full object-contain" />
-                        </div>
-                        <div className="p-3">
-                          <div className="font-medium text-sm truncate">{c.format.name}</div>
-                          <div className="text-xs text-muted-foreground font-mono">
-                            {c.format.width} × {c.format.height}
-                          </div>
-                          <Badge
-                            variant="primary"
-                            className="mt-2"
-                            style={{
-                              background: `${platforms[c.platform].color}20`,
-                              color: platforms[c.platform].color,
-                            }}
-                          >
-                            {platforms[c.platform].name}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              )}
+            </div>
 
-                  {/* HTML5 Previews */}
-                  {currentCategory.isHTML5 && sourceImage && (
-                    <div className="space-y-4">
-                      <h3 className="font-semibold flex items-center gap-2">
-                        <Play className="w-4 h-4" />
-                        HTML5 Náhled animací
-                      </h3>
-                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {currentCategory.formats.slice(0, 3).map((fmt, idx) => (
-                          <HTML5Preview
-                            key={idx}
-                            format={fmt}
-                            imageUrl={(sourceImage || '') as string}
-                            textOverlay={textOverlay as TextOverlay}
-                            isPMax={(currentCategory.isPMax || false) as boolean}
-                          />
-                        ))}
+            {/* Conditional editors based on category type */}
+            {categoryType === 'image' && (
+              <>
+                <TextOverlayEditor onGenerateAI={generateAIText} />
+                <WatermarkEditor />
+              </>
+            )}
+
+            {categoryType === 'branding' && (
+              <>
+                <TextOverlayEditor onGenerateAI={generateAIText} />
+                {/* Safe Zone info */}
+                <div className="p-4 border-b border-gray-100">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5" />
+                      <div>
+                        <div className="text-sm font-medium text-yellow-800">Safe Zone</div>
+                        <div className="text-xs text-yellow-700 mt-1">
+                          {currentCategory?.formats[0]?.safeZone?.description || 
+                           'Středová část může být zakrytá obsahem webu.'}
+                        </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Main Content - Format Grid */}
+      {categoryType !== 'video' && (
+        <div className="flex-1 overflow-y-auto bg-[#f8f9fa]">
+          {/* Toolbar */}
+          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-3 z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <h2 className="text-lg font-medium text-gray-900">
+                  {currentCategory?.name}
+                </h2>
+                <span className="badge-gray">
+                  {currentCategory?.formats.length} formátů
+                </span>
+                {maxSizeKB <= 150 && (
+                  <span className="badge-red">
+                    ⚠️ Max {maxSizeKB} kB
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    const keys = currentCategory?.formats.map((_, i) => 
+                      getFormatKey(platform, category, i)
+                    ) || []
+                    selectAllFormats(keys)
+                  }}
+                  className="btn-ghost text-sm py-1.5"
+                >
+                  Vybrat vše
+                </button>
+                <button
+                  onClick={clearSelection}
+                  className="btn-ghost text-sm py-1.5"
+                >
+                  Zrušit výběr
+                </button>
+                <button
+                  onClick={generateCreatives}
+                  disabled={isGenerating || selectedFormats.size === 0 || !sourceImage}
+                  className="btn-primary"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Spinner className="w-4 h-4" />
+                      {progress}%
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Generovat ({selectedFormats.size})
+                    </>
                   )}
-                </>
-              )}
-            </Card>
-          </TabsContent>
-
-          {/* History Tab */}
-          <TabsContent value="history">
-            <HistoryPanel />
-          </TabsContent>
-
-          {/* Video Tab */}
-          <TabsContent value="video">
-            <div className="grid lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <VideoGenerator />
-                <VideoScenarioEditor />
-              </div>
-              <div className="space-y-6">
-                <BrandKitManager />
-                <CostEstimator />
+                </button>
               </div>
             </div>
-          </TabsContent>
 
-          {/* Gallery Tab */}
-          <TabsContent value="gallery">
-            <div className="space-y-4">
-              <QualityCheck />
-              <GalleryView />
+            {isGenerating && (
+              <div className="mt-3">
+                <div className="progress-bar">
+                  <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Format Grid */}
+          <div className="p-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {currentCategory?.formats.map((format, index) => {
+                const formatKey = getFormatKey(platform, category, index)
+                const isSelected = selectedFormats.has(formatKey)
+                const creative = creatives[formatKey]
+                const hasSafeZone = format.safeZone !== undefined
+
+                return (
+                  <div
+                    key={formatKey}
+                    onClick={() => toggleFormat(formatKey)}
+                    className={cn(
+                      'format-card',
+                      isSelected && 'format-card-selected'
+                    )}
+                  >
+                    {/* Checkbox */}
+                    <div className={cn(
+                      'format-card-checkbox',
+                      isSelected && 'format-card-checkbox-checked'
+                    )}>
+                      {isSelected && <Check className="w-3 h-3" />}
+                    </div>
+
+                    {/* Preview */}
+                    <div 
+                      className="relative bg-gray-100 rounded mb-2 overflow-hidden"
+                      style={{ 
+                        paddingBottom: `${(format.height / format.width) * 100}%`,
+                        maxHeight: '120px'
+                      }}
+                    >
+                      {creative ? (
+                        <img 
+                          src={creative.imageUrl} 
+                          alt={format.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      ) : sourceImage ? (
+                        <img 
+                          src={sourceImage} 
+                          alt="Preview"
+                          className="absolute inset-0 w-full h-full object-cover opacity-50"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-300" />
+                        </div>
+                      )}
+
+                      {/* Safe Zone Overlay for branding */}
+                      {hasSafeZone && format.safeZone && (
+                        <SafeZoneOverlay 
+                          safeZone={format.safeZone}
+                          width={format.width}
+                          height={format.height}
+                        />
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {format.name}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {format.width} × {format.height}
+                    </div>
+                    {creative?.sizeKB && (
+                      <div className={cn(
+                        'text-xs mt-1',
+                        creative.sizeKB > maxSizeKB ? 'text-red-600 font-medium' : 'text-green-600'
+                      )}>
+                        {creative.sizeKB} kB {creative.sizeKB > maxSizeKB && '⚠️'}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          </TabsContent>
-        </Tabs>
-      </main>
+          </div>
 
-      {/* Settings Modal */}
-      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+          {/* Export bar */}
+          {Object.keys(creatives).length > 0 && (
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  {Object.keys(creatives).length} kreativ připraveno k exportu
+                </div>
+                <button onClick={handleExport} className="btn-primary">
+                  <Download className="w-4 h-4" />
+                  Stáhnout ZIP
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
+
+  const renderVideoStudio = () => (
+    <div className="flex-1 overflow-y-auto">
+      <VideoGenerator />
+    </div>
+  )
+
+  const renderLibrary = () => (
+    <div className="flex-1 overflow-y-auto">
+      <GalleryView />
+    </div>
+  )
+
+  const renderBrandKits = () => (
+    <div className="flex-1 overflow-y-auto">
+      <BrandKitManager />
+    </div>
+  )
+
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
+
+  return (
+    <div className="app-layout">
+      <Sidebar
+        currentView={currentView}
+        onNavigate={setCurrentView}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+
+      <main className="main-content flex flex-col">
+        {currentView === 'dashboard' && renderDashboard()}
+        {currentView === 'editor' && renderEditor()}
+        {currentView === 'video' && renderVideoStudio()}
+        {currentView === 'library' && renderLibrary()}
+        {currentView === 'brandkits' && renderBrandKits()}
+        {currentView === 'settings' && (
+          <div className="p-8">
+            <SettingsModal open={true} onClose={() => setCurrentView('dashboard')} />
+          </div>
+        )}
+      </main>
+
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    </div>
+  )
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function drawTextOverlay(
+  ctx: CanvasRenderingContext2D,
+  overlay: TextOverlay,
+  width: number,
+  height: number,
+  brandKit?: { ctaColor?: string; headlineFont?: string; textColor?: string }
+) {
+  if (!overlay.headline && !overlay.subheadline && !overlay.cta) return
+
+  const padding = Math.min(width, height) * 0.05
+  const fontFamily = brandKit?.headlineFont || 'system-ui, -apple-system, sans-serif'
+  const textColor = brandKit?.textColor || '#ffffff'
+  const ctaColor = overlay.ctaColor || brandKit?.ctaColor || '#1a73e8'
+
+  // Calculate position
+  let x = padding
+  let y = padding
+  let align: CanvasTextAlign = 'left'
+
+  switch (overlay.position) {
+    case 'top-center':
+      x = width / 2
+      align = 'center'
+      break
+    case 'top-right':
+      x = width - padding
+      align = 'right'
+      break
+    case 'center':
+      x = width / 2
+      y = height / 2 - 40
+      align = 'center'
+      break
+    case 'bottom-left':
+      y = height - padding - 80
+      break
+    case 'bottom-center':
+      x = width / 2
+      y = height - padding - 80
+      align = 'center'
+      break
+    case 'bottom-right':
+      x = width - padding
+      y = height - padding - 80
+      align = 'right'
+      break
+  }
+
+  ctx.textAlign = align
+  ctx.textBaseline = 'top'
+
+  // Font sizes based on overlay.fontSize
+  const baseSize = Math.min(width, height)
+  const sizes = {
+    small: { headline: baseSize * 0.06, sub: baseSize * 0.04, cta: baseSize * 0.035 },
+    medium: { headline: baseSize * 0.08, sub: baseSize * 0.05, cta: baseSize * 0.04 },
+    large: { headline: baseSize * 0.1, sub: baseSize * 0.06, cta: baseSize * 0.05 },
+  }
+  const size = sizes[overlay.fontSize]
+
+  let currentY = y
+
+  // Headline
+  if (overlay.headline) {
+    ctx.font = `bold ${size.headline}px ${fontFamily}`
+    ctx.fillStyle = textColor
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'
+    ctx.shadowBlur = 8
+    ctx.shadowOffsetX = 2
+    ctx.shadowOffsetY = 2
+    ctx.fillText(overlay.headline, x, currentY)
+    currentY += size.headline * 1.3
+  }
+
+  // Subheadline
+  if (overlay.subheadline) {
+    ctx.font = `${size.sub}px ${fontFamily}`
+    ctx.fillStyle = textColor
+    ctx.fillText(overlay.subheadline, x, currentY)
+    currentY += size.sub * 1.5
+  }
+
+  // CTA Button
+  if (overlay.cta) {
+    ctx.shadowBlur = 0
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = 0
+
+    const ctaWidth = ctx.measureText(overlay.cta).width + size.cta * 2
+    const ctaHeight = size.cta * 2
+
+    let ctaX = x
+    if (align === 'center') ctaX = x - ctaWidth / 2
+    else if (align === 'right') ctaX = x - ctaWidth
+
+    // Button background
+    ctx.fillStyle = ctaColor
+    ctx.beginPath()
+    const radius = ctaHeight / 2
+    ctx.roundRect(ctaX, currentY, ctaWidth, ctaHeight, radius)
+    ctx.fill()
+
+    // Button text
+    ctx.fillStyle = '#ffffff'
+    ctx.font = `bold ${size.cta}px ${fontFamily}`
+    ctx.textAlign = 'center'
+    ctx.fillText(overlay.cta, ctaX + ctaWidth / 2, currentY + (ctaHeight - size.cta) / 2)
+  }
+
+  // Reset
+  ctx.shadowBlur = 0
+  ctx.shadowOffsetX = 0
+  ctx.shadowOffsetY = 0
+}
+
+async function drawWatermark(
+  ctx: CanvasRenderingContext2D,
+  watermark: { image: string | null; opacity: number; size: number; position: string },
+  width: number,
+  height: number
+) {
+  if (!watermark.image) return
+
+  try {
+    const img = await loadImage(watermark.image)
+    const maxSize = Math.min(width, height) * (watermark.size / 100)
+    const ratio = img.width / img.height
+    const w = ratio > 1 ? maxSize : maxSize * ratio
+    const h = ratio > 1 ? maxSize / ratio : maxSize
+
+    let x = 0
+    let y = 0
+    const margin = Math.min(width, height) * 0.03
+
+    switch (watermark.position) {
+      case 'top-left':
+        x = margin
+        y = margin
+        break
+      case 'top-right':
+        x = width - w - margin
+        y = margin
+        break
+      case 'bottom-left':
+        x = margin
+        y = height - h - margin
+        break
+      case 'bottom-right':
+        x = width - w - margin
+        y = height - h - margin
+        break
+      case 'center':
+        x = (width - w) / 2
+        y = (height - h) / 2
+        break
+    }
+
+    ctx.globalAlpha = watermark.opacity
+    ctx.drawImage(img, x, y, w, h)
+    ctx.globalAlpha = 1
+  } catch (err) {
+    console.error('Watermark error:', err)
+  }
 }

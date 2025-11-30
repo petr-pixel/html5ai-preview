@@ -824,3 +824,157 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number):
     }, type, quality)
   })
 }
+
+// ============================================================================
+// SIMPLIFIED CREATIVE PACK EXPORT (for App.tsx)
+// ============================================================================
+
+import type { Creative } from '@/types'
+
+/**
+ * Vytvoří ZIP soubor s kreativami - COMPLIANCE struktura
+ * 
+ * Struktura:
+ * /Sklik_CZ/Bannery_150kB/     (auto-komprimované)
+ * /Sklik_CZ/Kombinovana/
+ * /Sklik_CZ/Branding/
+ * /Google_Ads/PMax/
+ * /Google_Ads/Display_150kB/   (auto-komprimované)
+ * /Video/
+ * compliance_report.json
+ */
+export async function createCreativePackZip(
+  creatives: Creative[],
+  onProgress?: (progress: number) => void
+): Promise<Blob> {
+  const JSZip = (await import('jszip')).default
+  const zip = new JSZip()
+
+  // Vytvoř strukturu složek
+  const folders = {
+    sklik_bannery: zip.folder('Sklik_CZ/Bannery_150kB')!,
+    sklik_kombinovana: zip.folder('Sklik_CZ/Kombinovana')!,
+    sklik_branding: zip.folder('Sklik_CZ/Branding')!,
+    sklik_interscroller: zip.folder('Sklik_CZ/Interscroller')!,
+    google_pmax: zip.folder('Google_Ads/PMax')!,
+    google_display: zip.folder('Google_Ads/Display_150kB')!,
+    google_demandgen: zip.folder('Google_Ads/DemandGen')!,
+    video: zip.folder('Video')!,
+  }
+
+  const report: {
+    summary: { total: number; compliant: number; compressed: number; oversized: number }
+    creatives: Array<{
+      platform: string
+      category: string
+      format: string
+      sizeKB: number
+      maxSizeKB: number
+      isCompliant: boolean
+      wasCompressed: boolean
+    }>
+  } = {
+    summary: { total: creatives.length, compliant: 0, compressed: 0, oversized: 0 },
+    creatives: [],
+  }
+
+  let processed = 0
+
+  for (const creative of creatives) {
+    const maxSizeKB = getMaxSizeForCategory(creative.platform, creative.category)
+    
+    // Konvertuj data URL na blob
+    const response = await fetch(creative.imageUrl)
+    let blob = await response.blob()
+    let sizeKB = blob.size / 1024
+    let wasCompressed = false
+
+    // Komprimuj pokud je potřeba
+    if (sizeKB > maxSizeKB) {
+      const compressed = await compressToSize(creative.imageUrl, maxSizeKB)
+      blob = compressed.blob
+      sizeKB = compressed.sizeKB
+      wasCompressed = true
+      report.summary.compressed++
+    }
+
+    const isCompliant = sizeKB <= maxSizeKB
+    if (isCompliant) {
+      report.summary.compliant++
+    } else {
+      report.summary.oversized++
+    }
+
+    // Vyber správnou složku
+    let folder: ReturnType<typeof zip.folder>
+    const folderKey = `${creative.platform}_${creative.category}` as keyof typeof folders
+    
+    if (creative.platform === 'sklik') {
+      switch (creative.category) {
+        case 'bannery': folder = folders.sklik_bannery; break
+        case 'kombinovana': folder = folders.sklik_kombinovana; break
+        case 'branding': folder = folders.sklik_branding; break
+        case 'interscroller': folder = folders.sklik_interscroller; break
+        default: folder = folders.sklik_bannery
+      }
+    } else {
+      switch (creative.category) {
+        case 'pmax': folder = folders.google_pmax; break
+        case 'display': folder = folders.google_display; break
+        case 'demandgen': folder = folders.google_demandgen; break
+        default: folder = folders.google_pmax
+      }
+    }
+
+    // Název souboru
+    const suffix = isCompliant ? '' : '_OVERSIZED'
+    const filename = `${creative.format.width}x${creative.format.height}${suffix}.jpg`
+    
+    folder?.file(filename, blob)
+
+    // Report
+    report.creatives.push({
+      platform: creative.platform,
+      category: creative.category,
+      format: `${creative.format.width}x${creative.format.height}`,
+      sizeKB: Math.round(sizeKB * 10) / 10,
+      maxSizeKB,
+      isCompliant,
+      wasCompressed,
+    })
+
+    processed++
+    onProgress?.(Math.round((processed / creatives.length) * 100))
+  }
+
+  // Přidej report
+  zip.file('compliance_report.json', JSON.stringify(report, null, 2))
+
+  // Přidej README
+  const readme = `AdCreative Studio Export
+========================
+Generated: ${new Date().toISOString()}
+
+Summary:
+- Total creatives: ${report.summary.total}
+- Compliant: ${report.summary.compliant}
+- Compressed: ${report.summary.compressed}
+- Oversized (need manual fix): ${report.summary.oversized}
+
+Folder Structure:
+- /Sklik_CZ/Bannery_150kB/ - Sklik banners (max 150kB)
+- /Sklik_CZ/Kombinovana/ - Sklik responsive (max 2MB)
+- /Sklik_CZ/Branding/ - Desktop branding (max 500kB)
+- /Google_Ads/PMax/ - Performance Max (max 5MB)
+- /Google_Ads/Display_150kB/ - GDN banners (max 150kB)
+
+Files marked with _OVERSIZED need manual optimization.
+`
+  zip.file('README.txt', readme)
+
+  return await zip.generateAsync({ 
+    type: 'blob', 
+    compression: 'DEFLATE',
+    compressionOptions: { level: 9 }
+  })
+}
