@@ -1,0 +1,362 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   GOOGLE ADS STYLE - Light Theme Only
+   Primary: #1a73e8 (Google Blue)
+   Background: #f8f9fa
+   ============================================================================ */
+
+@layer base {
+  :root {
+    --background: 210 17% 98%;
+    --foreground: 220 13% 18%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 18%;
+    --primary: 217 89% 51%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 13% 18%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 217 89% 95%;
+    --accent-foreground: 217 89% 40%;
+    --destructive: 4 90% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 89% 51%;
+    --radius: 0.5rem;
+    
+    /* Google Colors */
+    --google-blue: #1a73e8;
+    --google-blue-hover: #1557b0;
+    --google-red: #ea4335;
+    --google-yellow: #fbbc04;
+    --google-green: #34a853;
+    --google-gray-50: #f8f9fa;
+    --google-gray-100: #f1f3f4;
+    --google-gray-200: #e8eaed;
+    --google-gray-300: #dadce0;
+    --google-gray-400: #bdc1c6;
+    --google-gray-500: #9aa0a6;
+    --google-gray-600: #80868b;
+    --google-gray-700: #5f6368;
+    --google-gray-800: #3c4043;
+    --google-gray-900: #202124;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-[#f8f9fa] text-gray-900 antialiased;
+    font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  
+  /* Scrollbar - Light */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #f1f3f4;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #dadce0;
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #bdc1c6;
+  }
+}
+
+@layer components {
+  /* ============================================================================
+     LAYOUT
+     ============================================================================ */
+  
+  .app-layout {
+    @apply flex h-screen bg-[#f8f9fa];
+  }
+  
+  .main-content {
+    @apply flex-1 overflow-auto;
+  }
+  
+  /* ============================================================================
+     CARDS
+     ============================================================================ */
+  
+  .card-google {
+    @apply bg-white rounded-lg border border-gray-200;
+  }
+  
+  .card-google-elevated {
+    @apply bg-white rounded-lg shadow-md;
+  }
+  
+  .card-google-hover {
+    @apply bg-white rounded-lg border border-gray-200 
+           hover:shadow-md hover:border-gray-300 transition-all cursor-pointer;
+  }
+  
+  /* ============================================================================
+     BUTTONS - Google Material Style
+     ============================================================================ */
+  
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           bg-[#1a73e8] text-white font-medium
+           px-4 py-2 rounded-md
+           hover:bg-[#1557b0] active:bg-[#174ea6]
+           focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed
+           transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2
+           bg-white text-[#1a73e8] font-medium
+           px-4 py-2 rounded-md
+           border border-gray-300
+           hover:bg-[#f8f9fa] hover:border-[#1a73e8]
+           active:bg-gray-100
+           focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:ring-offset-2
+           transition-colors;
+  }
+  
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           text-gray-700 font-medium
+           px-4 py-2 rounded-md
+           hover:bg-gray-100
+           active:bg-gray-200
+           transition-colors;
+  }
+  
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2
+           bg-[#ea4335] text-white font-medium
+           px-4 py-2 rounded-md
+           hover:bg-red-700 active:bg-red-800
+           focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2
+           transition-colors;
+  }
+  
+  /* ============================================================================
+     FORM INPUTS
+     ============================================================================ */
+  
+  .input-google {
+    @apply w-full px-3 py-2
+           bg-white border border-gray-300 rounded-md
+           text-gray-900 placeholder-gray-500
+           focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-transparent
+           disabled:bg-gray-100 disabled:text-gray-500
+           transition-all;
+  }
+  
+  .textarea-google {
+    @apply w-full px-3 py-2
+           bg-white border border-gray-300 rounded-md
+           text-gray-900 placeholder-gray-500 resize-none
+           focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-transparent
+           transition-all;
+  }
+  
+  .select-google {
+    @apply w-full px-3 py-2
+           bg-white border border-gray-300 rounded-md
+           text-gray-900
+           focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-transparent
+           cursor-pointer
+           transition-all;
+  }
+  
+  /* ============================================================================
+     BADGES & CHIPS
+     ============================================================================ */
+  
+  .badge-blue {
+    @apply inline-flex items-center px-2 py-0.5
+           bg-blue-50 text-blue-700 text-xs font-medium rounded-full;
+  }
+  
+  .badge-green {
+    @apply inline-flex items-center px-2 py-0.5
+           bg-green-50 text-green-700 text-xs font-medium rounded-full;
+  }
+  
+  .badge-red {
+    @apply inline-flex items-center px-2 py-0.5
+           bg-red-50 text-red-700 text-xs font-medium rounded-full;
+  }
+  
+  .badge-yellow {
+    @apply inline-flex items-center px-2 py-0.5
+           bg-yellow-50 text-yellow-700 text-xs font-medium rounded-full;
+  }
+  
+  .badge-gray {
+    @apply inline-flex items-center px-2 py-0.5
+           bg-gray-100 text-gray-700 text-xs font-medium rounded-full;
+  }
+  
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5
+           bg-gray-100 text-gray-700 text-sm font-medium rounded-full
+           hover:bg-gray-200 cursor-pointer transition-colors;
+  }
+  
+  .chip-active {
+    @apply bg-blue-50 text-blue-700 hover:bg-blue-100;
+  }
+  
+  /* ============================================================================
+     TABS - Google Style
+     ============================================================================ */
+  
+  .tabs-google {
+    @apply flex border-b border-gray-200;
+  }
+  
+  .tab-google {
+    @apply px-4 py-3 text-sm font-medium text-gray-600
+           border-b-2 border-transparent
+           hover:text-gray-900 hover:border-gray-300
+           transition-colors cursor-pointer;
+  }
+  
+  .tab-google-active {
+    @apply text-[#1a73e8] border-[#1a73e8];
+  }
+  
+  /* ============================================================================
+     SAFE ZONE OVERLAY (pro Branding)
+     ============================================================================ */
+  
+  .safe-zone-overlay {
+    @apply absolute inset-0 pointer-events-none;
+  }
+  
+  .safe-zone-danger {
+    @apply absolute bg-red-500/30 border-2 border-dashed border-red-500;
+  }
+  
+  .safe-zone-label {
+    @apply absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+           bg-red-500 text-white text-xs font-bold px-2 py-1 rounded;
+  }
+  
+  /* ============================================================================
+     FORMAT CARD
+     ============================================================================ */
+  
+  .format-card {
+    @apply relative p-3 bg-white border border-gray-200 rounded-lg
+           hover:border-blue-300 hover:shadow-sm
+           cursor-pointer transition-all;
+  }
+  
+  .format-card-selected {
+    @apply border-[#1a73e8] bg-blue-50 ring-1 ring-[#1a73e8];
+  }
+  
+  .format-card-checkbox {
+    @apply absolute top-2 right-2 w-5 h-5 rounded
+           border-2 border-gray-300
+           flex items-center justify-center
+           transition-colors;
+  }
+  
+  .format-card-checkbox-checked {
+    @apply bg-[#1a73e8] border-[#1a73e8] text-white;
+  }
+  
+  /* ============================================================================
+     PROGRESS BAR
+     ============================================================================ */
+  
+  .progress-bar {
+    @apply w-full h-2 bg-gray-200 rounded-full overflow-hidden;
+  }
+  
+  .progress-bar-fill {
+    @apply h-full bg-[#1a73e8] transition-all duration-300;
+  }
+  
+  /* ============================================================================
+     TOOLTIPS
+     ============================================================================ */
+  
+  .tooltip {
+    @apply absolute z-50 px-2 py-1
+           bg-gray-800 text-white text-xs rounded
+           shadow-lg whitespace-nowrap;
+  }
+  
+  /* ============================================================================
+     ANIMATIONS
+     ============================================================================ */
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideUp {
+    from { 
+      opacity: 0; 
+      transform: translateY(10px); 
+    }
+    to { 
+      opacity: 1; 
+      transform: translateY(0); 
+    }
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-pulse {
+    animation: pulse 2s infinite;
+  }
+  
+  /* ============================================================================
+     UTILITIES
+     ============================================================================ */
+  
+  .text-google-blue {
+    color: #1a73e8;
+  }
+  
+  .bg-google-blue {
+    background-color: #1a73e8;
+  }
+  
+  .border-google-blue {
+    border-color: #1a73e8;
+  }
+  
+  .ring-google-blue {
+    --tw-ring-color: #1a73e8;
+  }
+}
