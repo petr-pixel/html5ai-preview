@@ -259,6 +259,10 @@ export const useAppStore = create<AppState>()(
           state.apiKeys = { ...state.apiKeys, ...keys }
         }),
 
+      // Supabase config for auth & cloud storage
+      supabaseConfig: null as { url: string; anonKey: string } | null,
+      setSupabaseConfig: (config: { url: string; anonKey: string } | null) => set({ supabaseConfig: config }),
+
       // UI State
       isGenerating: false,
       progress: 0,
@@ -273,6 +277,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         apiKeys: state.apiKeys,
         r2Config: state.r2Config,
+        supabaseConfig: (state as any).supabaseConfig,
         history: state.history,
         textOverlay: state.textOverlay,
         watermark: state.watermark,

@@ -24,6 +24,18 @@ Profesionální nástroj pro generování reklamních kreativ pro **Sklik** a **
 - **Brand Kit** - loga, barvy, fonty
 - **Automatická aplikace** - na všechny kreativy
 
+### 🤖 AI Nástroje (Ctrl+K)
+- **Creative Scoring** - Predikce CTR, heatmapa pozornosti, doporučení
+- **AI Copywriter** - AIDA/PAS/4U frameworky, multi-jazyk
+- **Magic Resize** - Všechny formáty jedním klikem
+- **Template Library** - Šablony podle odvětví (e-commerce, food, travel...)
+- **Landing Page Scanner** - Extrakce barev a textů z URL
+
+### ☁️ Cloud & Auth
+- **Supabase** - Free tier: neomezení uživatelé + 1GB storage
+- **Google OAuth** - Přihlášení jedním klikem
+- **Sync** - Synchronizace Brand Kitů a kreativ
+
 ## 📋 Podporované platformy a formáty
 
 ### Sklik (Seznam.cz)

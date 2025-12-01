@@ -27,7 +27,9 @@ import { QuickMode } from '@/components/QuickMode'
 import { SafeZoneOverlay } from '@/components/SafeZoneOverlay'
 import { ImagePositionControl } from '@/components/ImagePositionControl'
 import { PerFormatTextEditor } from '@/components/PerFormatTextEditor'
-import { FormatEditor } from '@/components/FormatEditor'
+import { FormatEditorV2 } from '@/components/FormatEditorV2'
+import { ToolsPanel, ToolsButton } from '@/components/ToolsPanel'
+import { AuthProvider, LoginModal, UserMenu } from '@/components/AuthProvider'
 import { downloadBlob, createCreativePackZip } from '@/lib/export'
 import { calculateSmartCrop } from '@/lib/smart-crop'
 import { Button, Progress, Spinner } from '@/components/ui'
@@ -106,7 +108,21 @@ export default function App() {
   const [currentView, setCurrentView] = useState<NavigationView>('editor')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editingFormat, setEditingFormat] = useState<{ key: string; format: any } | null>(null)
+  const [toolsPanelOpen, setToolsPanelOpen] = useState(false)
+  const [loginModalOpen, setLoginModalOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Keyboard shortcut for tools panel (Ctrl+K)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setToolsPanelOpen(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Store
   const {
@@ -1360,12 +1376,13 @@ export default function App() {
   // ============================================================================
 
   return (
-    <div className="app-layout">
-      <Sidebar
-        currentView={currentView}
-        onNavigate={setCurrentView}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
+    <AuthProvider>
+      <div className="app-layout">
+        <Sidebar
+          currentView={currentView}
+          onNavigate={setCurrentView}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
 
       <main className="main-content flex flex-col">
         {currentView === 'dashboard' && renderDashboard()}
@@ -1385,14 +1402,48 @@ export default function App() {
 
       {/* Format Editor Modal */}
       {editingFormat && (
-        <FormatEditor
+        <FormatEditorV2
           formatKey={editingFormat.key}
           format={editingFormat.format}
           sourceImage={sourceImage}
           onClose={() => setEditingFormat(null)}
+          onSave={(textLayer, renderedImage) => {
+            // Uložit editovanou kreativu
+            const creative = {
+              id: `${editingFormat.key}-${Date.now()}`,
+              formatKey: editingFormat.key,
+              platform: platform as any,
+              category: category,
+              format: editingFormat.format,
+              baseImageUrl: sourceImage || '',
+              imageUrl: renderedImage,
+              textLayer,
+              createdAt: new Date(),
+            }
+            addCreatives([creative])
+          }}
         />
       )}
+
+      {/* Tools Panel */}
+      <ToolsPanel 
+        isOpen={toolsPanelOpen} 
+        onClose={() => setToolsPanelOpen(false)} 
+      />
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={loginModalOpen} 
+        onClose={() => setLoginModalOpen(false)} 
+      />
+
+      {/* Floating Tools Button */}
+      <div className="fixed bottom-6 right-6 z-30 flex items-center gap-3">
+        <UserMenu onOpenLogin={() => setLoginModalOpen(true)} />
+        <ToolsButton onClick={() => setToolsPanelOpen(true)} />
+      </div>
     </div>
+    </AuthProvider>
   )
 }
 

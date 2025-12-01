@@ -162,7 +162,14 @@ export interface Creative {
   platform: PlatformId
   category: string
   format: Format
-  imageUrl: string
+  
+  // === NOVÝ SYSTÉM: Oddělené vrstvy ===
+  baseImageUrl: string           // Obrázek BEZ textu
+  textLayer?: TextLayer          // Textová vrstva (editovatelná per-formát)
+  
+  // === Legacy (pro zpětnou kompatibilitu) ===
+  imageUrl: string               // Finální renderovaný obrázek (s textem)
+  
   createdAt: Date
   variant?: 'A' | 'B' | 'C'
   sourceVariantId?: string
@@ -197,6 +204,59 @@ export interface TextOverlay {
   fontSize: 'small' | 'medium' | 'large'
 }
 
+// ============================================================================
+// TEXT LAYER SYSTEM (nový systém pro per-formát editaci)
+// ============================================================================
+
+/**
+ * Pozice a styl jednoho textového prvku
+ * Všechny pozice jsou v % (0-100) relativně k rozměrům formátu
+ */
+export interface TextElement {
+  text: string
+  visible: boolean
+  x: number           // % od levého okraje
+  y: number           // % od horního okraje
+  fontSize: number    // px
+  fontWeight: 'normal' | 'bold'
+  color: string
+  textAlign: 'left' | 'center' | 'right'
+  maxWidth: number    // % šířky formátu
+  shadow: boolean
+}
+
+export interface CTAElement extends TextElement {
+  backgroundColor: string
+  paddingX: number    // px
+  paddingY: number    // px
+  borderRadius: number // px
+}
+
+export interface LogoElement {
+  visible: boolean
+  x: number           // % od levého okraje
+  y: number           // % od horního okraje
+  width: number       // % šířky formátu
+  opacity: number     // 0-1
+  variant: 'main' | 'light' | 'dark' | 'auto'
+}
+
+/**
+ * Kompletní textová vrstva pro jeden formát
+ * Oddělená od obrázku = lze editovat nezávisle
+ */
+export interface TextLayer {
+  headline: TextElement
+  subheadline: TextElement
+  cta: CTAElement
+  logo: LogoElement
+}
+
+/**
+ * Default pozice podle aspect ratio formátu
+ */
+export type LayoutPreset = 'auto' | 'bottom-left' | 'bottom-center' | 'center' | 'top-left' | 'left-stack' | 'right-stack'
+
 export interface Watermark {
   enabled: boolean
   image: string | null
@@ -220,23 +280,51 @@ export interface QRCode {
 export interface BrandKit {
   id: string
   name: string
-  // Loga
-  logoSquare?: string      // 1:1
-  logoHorizontal?: string  // 4:1
-  // Barvy
-  primaryColor: string
-  secondaryColor: string
-  ctaColor: string
-  textColor: string
-  backgroundColor: string
-  // Fonty
+  
+  // ===== LOGA =====
+  logoMain?: string           // Hlavní logo (PNG s průhledností)
+  logoLight?: string          // Světlá verze (pro tmavé pozadí)
+  logoDark?: string           // Tmavá verze (pro světlé pozadí)
+  // Deprecated - pro zpětnou kompatibilitu
+  logoSquare?: string
+  logoHorizontal?: string
+  
+  // ===== BARVY =====
+  primaryColor: string        // Hlavní barva (CTA, akcenty)
+  secondaryColor: string      // Sekundární (pozadí textů, rámečky)
+  textLight: string           // Text na tmavém pozadí (#FFFFFF)
+  textDark: string            // Text na světlém pozadí (#1A1A1A)
+  // Deprecated
+  ctaColor?: string
+  textColor?: string
+  backgroundColor?: string
+  
+  // ===== TEXTOVÉ ŠABLONY =====
+  headlineTemplates: string[]  // ["Objevte {produkt}", "Sleva {sleva}%", ...]
+  ctaTemplates: string[]       // ["Koupit nyní", "Zjistit více", ...]
+  tagline?: string             // Firemní slogan
+  
+  // ===== PRAVIDLA LOGA =====
+  logoRules: {
+    autoApply: boolean         // Automaticky přidávat na kreativy
+    position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center'
+    size: number               // % šířky kreativy (5-30)
+    padding: number            // Padding od okraje v px
+    opacity: number            // 0-100
+    autoSelectVariant: boolean // Automaticky vybrat light/dark podle pozadí
+  }
+  
+  // ===== FONTY =====
   headlineFont?: string
   bodyFont?: string
-  // Default CTA pro různé jazyky
-  defaultCTA?: Record<string, string>  // { cs: "Nakoupit", sk: "Nakúpiť", de: "Kaufen" }
-  // Metadata
+  
+  // ===== METADATA =====
   createdAt: Date
+  updatedAt?: Date
   isDefault: boolean
+  
+  // Deprecated
+  defaultCTA?: Record<string, string>
 }
 
 // ============================================================================
