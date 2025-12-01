@@ -1,1 +1,0 @@
-export { useStorageSync } from './useStorageSync'
