@@ -1,0 +1,1 @@
+export { useStorageSync } from './useStorageSync'
