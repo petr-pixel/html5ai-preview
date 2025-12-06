@@ -1,0 +1,555 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   ADCREATIVE STUDIO - GOOGLE ADS STYLE (LIGHT)
+   Čistý, profesionální design inspirovaný Google Ads
+   
+   Primary: Google Blue (#1a73e8)
+   Success: Google Green (#1e8e3e)
+   Background: Light Gray (#f8f9fa)
+   ============================================================================ */
+
+@layer base {
+  :root {
+    /* Light mode variables */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 20%;
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 0 0% 20%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 0 0% 20%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 50%;
+    
+    /* Google Colors */
+    --google-blue: #1a73e8;
+    --google-green: #1e8e3e;
+    --google-red: #ea4335;
+    --google-yellow: #fbbc05;
+    
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-gray-200;
+  }
+  
+  html {
+    color-scheme: light;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+  }
+  
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+}
+
+@layer components {
+  /* ============================================================================
+     GRADIENT MESH BACKGROUND
+     ============================================================================ */
+  
+  /* ============================================================================
+     LIGHT MODE BACKGROUNDS
+     ============================================================================ */
+  
+  .mesh-gradient-bg {
+    background: #f8f9fa;
+  }
+  
+  .mesh-gradient-static {
+    background: #f8f9fa;
+  }
+  
+  /* ============================================================================
+     CARDS - LIGHT MODE
+     ============================================================================ */
+  
+  .glass-card {
+    @apply relative rounded-2xl bg-white;
+    border: 1px solid #e8eaed;
+    box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.1);
+  }
+  
+  .glass-card-hover {
+    @apply glass-card transition-all duration-200;
+  }
+  
+  .glass-card-hover:hover {
+    box-shadow: 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+  }
+  
+  .glass-card-active {
+    background: rgba(139, 92, 246, 0.1);
+    border-color: rgba(139, 92, 246, 0.3);
+    box-shadow: 
+      0 0 20px rgba(139, 92, 246, 0.2),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  }
+  
+  .glass-card-glow {
+    @apply glass-card;
+    box-shadow: 
+      0 4px 24px -1px rgba(0, 0, 0, 0.2),
+      0 0 40px -10px rgba(139, 92, 246, 0.3),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+  
+  /* ============================================================================
+     GRADIENT BUTTONS
+     ============================================================================ */
+  
+  .btn-gradient {
+    @apply relative inline-flex items-center justify-center gap-2
+           px-5 py-2.5 rounded-xl font-medium
+           text-white overflow-hidden
+           transition-all duration-300;
+    background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 50%, #3B82F6 100%);
+    box-shadow: 
+      0 4px 15px -3px rgba(139, 92, 246, 0.4),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  }
+  
+  .btn-gradient:hover {
+    transform: translateY(-1px);
+    box-shadow: 
+      0 8px 25px -5px rgba(139, 92, 246, 0.5),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.25);
+  }
+  
+  .btn-gradient:active {
+    transform: translateY(0);
+  }
+  
+  .btn-gradient-cyan {
+    background: linear-gradient(135deg, #06B6D4 0%, #0EA5E9 50%, #3B82F6 100%);
+    box-shadow: 0 4px 15px -3px rgba(6, 182, 212, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  }
+  
+  .btn-gradient-pink {
+    background: linear-gradient(135deg, #EC4899 0%, #F472B6 50%, #A855F7 100%);
+    box-shadow: 0 4px 15px -3px rgba(236, 72, 153, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  }
+  
+  .btn-gradient-success {
+    background: linear-gradient(135deg, #10B981 0%, #34D399 50%, #06B6D4 100%);
+    box-shadow: 0 4px 15px -3px rgba(16, 185, 129, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  }
+  
+  .btn-glass {
+    @apply inline-flex items-center justify-center gap-2
+           px-5 py-2.5 rounded-xl font-medium
+           text-white/90 transition-all duration-300;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .btn-glass:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           px-4 py-2 rounded-lg font-medium
+           text-white/70 transition-all duration-200;
+  }
+  
+  .btn-ghost:hover {
+    @apply text-white bg-white/5;
+  }
+  
+  /* ============================================================================
+     SIDEBAR
+     ============================================================================ */
+  
+  .sidebar {
+    @apply w-64 flex flex-col;
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl
+           text-white/60 font-medium
+           transition-all duration-200 cursor-pointer;
+  }
+  
+  .sidebar-item:hover {
+    @apply text-white/90 bg-white/5;
+  }
+  
+  .sidebar-item-active {
+    @apply text-white bg-gradient-to-r from-violet-500/20 to-transparent;
+    border-left: 3px solid #8B5CF6;
+    margin-left: -1px;
+  }
+  
+  /* ============================================================================
+     FORM INPUTS
+     ============================================================================ */
+  
+  .input-glass {
+    @apply w-full px-4 py-3 rounded-xl
+           text-white placeholder-white/40
+           transition-all duration-200;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .input-glass:focus {
+    @apply outline-none;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+  }
+  
+  /* ============================================================================
+     BADGES
+     ============================================================================ */
+  
+  .badge-gradient {
+    @apply inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    color: #C4B5FD;
+  }
+  
+  .badge-cyan {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.2) 0%, rgba(14, 165, 233, 0.2) 100%);
+    border-color: rgba(6, 182, 212, 0.3);
+    color: #67E8F9;
+  }
+  
+  .badge-pink {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(244, 114, 182, 0.2) 100%);
+    border-color: rgba(236, 72, 153, 0.3);
+    color: #F9A8D4;
+  }
+  
+  .badge-success {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(52, 211, 153, 0.2) 100%);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #6EE7B7;
+  }
+  
+  .badge-pro {
+    background: linear-gradient(135deg, #F59E0B 0%, #EAB308 100%);
+    color: #1F2937;
+    border: none;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  }
+  
+  /* ============================================================================
+     STAT CARDS
+     ============================================================================ */
+  
+  .stat-card {
+    @apply glass-card p-5;
+  }
+  
+  .stat-card-icon {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(99, 102, 241, 0.1) 100%);
+  }
+  
+  .stat-card-icon-cyan {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.2) 0%, rgba(14, 165, 233, 0.1) 100%);
+  }
+  
+  .stat-card-icon-pink {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(244, 114, 182, 0.1) 100%);
+  }
+  
+  .stat-card-icon-green {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(52, 211, 153, 0.1) 100%);
+  }
+  
+  /* ============================================================================
+     PROGRESS BARS
+     ============================================================================ */
+  
+  .progress-bar {
+    @apply w-full h-2 rounded-full overflow-hidden;
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .progress-bar-fill {
+    @apply h-full rounded-full transition-all duration-500;
+    background: linear-gradient(90deg, #8B5CF6 0%, #06B6D4 100%);
+  }
+  
+  .progress-bar-fill-warning {
+    background: linear-gradient(90deg, #F59E0B 0%, #EF4444 100%);
+  }
+  
+  /* ============================================================================
+     FORMAT CARDS
+     ============================================================================ */
+  
+  .format-card {
+    @apply relative p-4 rounded-xl cursor-pointer transition-all duration-300;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  .format-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+    transform: translateY(-2px);
+  }
+  
+  .format-card-selected {
+    background: rgba(139, 92, 246, 0.1);
+    border-color: rgba(139, 92, 246, 0.4);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  }
+  
+  /* ============================================================================
+     MODAL
+     ============================================================================ */
+  
+  .modal-overlay {
+    @apply fixed inset-0 z-50;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+  }
+  
+  .modal-content {
+    @apply glass-card p-6;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  /* ============================================================================
+     DIVIDERS
+     ============================================================================ */
+  
+  .divider {
+    @apply h-px w-full;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%);
+  }
+  
+  /* ============================================================================
+     GLOW EFFECTS
+     ============================================================================ */
+  
+  .glow-violet { box-shadow: 0 0 40px rgba(139, 92, 246, 0.3); }
+  .glow-cyan { box-shadow: 0 0 40px rgba(6, 182, 212, 0.3); }
+  .glow-pink { box-shadow: 0 0 40px rgba(236, 72, 153, 0.3); }
+  .text-glow { text-shadow: 0 0 20px rgba(139, 92, 246, 0.5); }
+  
+  /* ============================================================================
+     ANIMATIONS
+     ============================================================================ */
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+    50% { box-shadow: 0 0 40px rgba(139, 92, 246, 0.5); }
+  }
+  
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  
+  .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+  .animate-slide-up { animation: slideUp 0.4s ease-out; }
+  .animate-scale-in { animation: scaleIn 0.3s ease-out; }
+  .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+  
+  .animate-shimmer {
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+  
+  /* ============================================================================
+     UTILITIES
+     ============================================================================ */
+  
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #8B5CF6 0%, #06B6D4 100%);
+  }
+  
+  .text-gradient-pink {
+    background-image: linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%);
+  }
+  
+  .bg-gradient-mesh {
+    background: 
+      radial-gradient(ellipse at 20% 0%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 0%, rgba(6, 182, 212, 0.12) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 100%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
+  }
+  
+  /* ============================================================================
+     MOBILE STYLES & SAFE AREAS
+     ============================================================================ */
+  
+  /* Safe area padding (for iPhone notch, etc.) */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+  
+  /* CSS variables for safe areas */
+  :root {
+    --sat: env(safe-area-inset-top);
+    --sar: env(safe-area-inset-right);
+    --sab: env(safe-area-inset-bottom);
+    --sal: env(safe-area-inset-left);
+  }
+  
+  /* Touch-friendly tap targets */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Prevent text selection on touch */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  
+  /* Smooth momentum scrolling on iOS */
+  .scroll-smooth-touch {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Mobile bottom nav spacer */
+  .mb-nav {
+    margin-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+  
+  /* Pull to refresh indicator */
+  .pull-indicator {
+    @apply flex items-center justify-center;
+    transition: transform 0.2s ease-out;
+  }
+  
+  /* Mobile card with swipe actions */
+  .swipe-card {
+    @apply relative overflow-hidden;
+    touch-action: pan-y;
+  }
+  
+  /* ============================================================================
+     RESPONSIVE TYPOGRAPHY
+     ============================================================================ */
+  
+  @screen sm {
+    .text-responsive-lg { @apply text-lg; }
+    .text-responsive-xl { @apply text-xl; }
+  }
+  
+  @screen md {
+    .text-responsive-lg { @apply text-xl; }
+    .text-responsive-xl { @apply text-2xl; }
+  }
+  
+  /* ============================================================================
+     TOAST ANIMATIONS
+     ============================================================================ */
+  
+  @keyframes toast-enter {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes toast-exit {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+  }
+  
+  .toast-enter {
+    animation: toast-enter 0.3s ease-out;
+  }
+  
+  .toast-exit {
+    animation: toast-exit 0.2s ease-in forwards;
+  }
+  
+  /* ============================================================================
+     KEYBOARD SHORTCUT BADGES
+     ============================================================================ */
+  
+  kbd {
+    @apply inline-flex items-center justify-center 
+           px-1.5 py-0.5 text-xs font-mono
+           bg-white/10 border border-white/20 rounded;
+  }
+}
