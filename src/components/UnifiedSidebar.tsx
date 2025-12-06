@@ -1,27 +1,21 @@
 /**
- * Unified Sidebar - Gradient Mesh Design
- * Moderní dark theme s glassmorphism a živými gradienty
+ * Unified Sidebar - Clean Dark Design
+ * Jednoduchý, čistý sidebar s gradienty
  */
 
 import React, { useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { useAuth } from '@/components/Auth'
 import { platforms } from '@/lib/platforms'
-import { StorageStatusBar } from '@/components/StorageProvider'
-import { UsageBanner } from '@/components/UsageBanner'
 import type { PlatformId } from '@/types'
 import {
   LayoutDashboard,
   Sparkles,
   Wand2,
-  Image,
-  LayoutGrid,
   Brain,
   FileText,
   Maximize2,
   Layout,
-  ScanLine,
-  Palette,
   Images,
   FolderOpen,
   Smartphone,
@@ -30,14 +24,11 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
-  Zap,
   Video,
   Play,
-  Star,
-  Crown,
   Shield,
-  ArrowRight,
-  Rocket,
+  Eye,
+  HardDrive,
 } from 'lucide-react'
 
 // ============================================================================
@@ -70,87 +61,175 @@ interface SidebarProps {
 }
 
 // ============================================================================
-// SIDEBAR SECTION
+// COLLAPSIBLE SECTION
 // ============================================================================
 
-interface SidebarSectionProps {
+interface SectionProps {
   title: string
   icon: React.ReactNode
   children: React.ReactNode
   defaultOpen?: boolean
-  badge?: string
-  gradient?: string
+  badge?: string | number
 }
 
-function SidebarSection({ title, icon, children, defaultOpen = false, badge, gradient }: SidebarSectionProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
+function Section({ title, icon, children, defaultOpen = false, badge }: SectionProps) {
+  const [open, setOpen] = useState(defaultOpen)
 
   return (
     <div className="mb-1">
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-white/5 transition-all duration-200 group"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
       >
-        <span className={`flex-shrink-0 ${gradient || 'text-violet-400'} transition-colors`}>{icon}</span>
-        <span className="flex-1 text-left text-sm font-medium text-white/70 group-hover:text-white/90">{title}</span>
+        <span className="text-white/50">{icon}</span>
+        <span className="flex-1 text-left text-sm font-medium text-white/70">{title}</span>
         {badge && (
-          <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-violet-500/20 text-violet-300">
             {badge}
           </span>
         )}
-        <ChevronDown className={`w-4 h-4 text-white/30 transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        {open ? (
+          <ChevronDown className="w-4 h-4 text-white/30" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-white/30" />
+        )}
       </button>
-      
-      {isOpen && (
-        <div className="px-2 pb-2 pt-1">
-          {children}
-        </div>
-      )}
+      {open && <div className="mt-1 ml-2 space-y-0.5">{children}</div>}
     </div>
   )
 }
 
 // ============================================================================
-// SIDEBAR ITEM
+// NAV ITEM
 // ============================================================================
 
-interface SidebarItemProps {
+interface NavItemProps {
   icon: React.ReactNode
   label: string
+  sublabel?: string
   active?: boolean
   onClick: () => void
   badge?: string
-  pro?: boolean
-  description?: string
 }
 
-function SidebarItem({ icon, label, active, onClick, badge, pro, description }: SidebarItemProps) {
+function NavItem({ icon, label, sublabel, active, onClick, badge }: NavItemProps) {
   return (
     <button
       onClick={onClick}
-      title={description}
-      className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-        active 
-          ? 'bg-gradient-to-r from-violet-500/20 to-cyan-500/10 text-white border-l-2 border-violet-500 ml-[-1px]' 
-          : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
+        active
+          ? 'bg-violet-500/20 text-white border-l-2 border-violet-500 ml-0 pl-[10px]'
+          : 'text-white/60 hover:bg-white/5 hover:text-white/80'
       }`}
     >
-      <span className={`flex-shrink-0 ${active ? 'text-violet-400' : 'text-white/40'}`}>{icon}</span>
+      <span className={active ? 'text-violet-400' : 'text-white/40'}>{icon}</span>
       <div className="flex-1 text-left min-w-0">
-        <span className="text-sm font-medium block truncate">{label}</span>
-        {description && (
-          <span className="text-[10px] text-white/30 group-hover:text-white/50 transition-colors block truncate">{description}</span>
-        )}
+        <div className="text-sm font-medium truncate">{label}</div>
+        {sublabel && <div className="text-[10px] text-white/40 truncate">{sublabel}</div>}
       </div>
       {badge && (
-        <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-500/20 text-amber-300">
           {badge}
         </span>
       )}
-      {pro && (
-        <Crown className="w-4 h-4 text-amber-400 flex-shrink-0" />
-      )}
     </button>
+  )
+}
+
+// ============================================================================
+// PLATFORM BUTTON
+// ============================================================================
+
+interface PlatformButtonProps {
+  platform: typeof platforms[PlatformId]
+  platformId: PlatformId
+  active: boolean
+  onClick: () => void
+}
+
+function PlatformButton({ platform, platformId, active, onClick }: PlatformButtonProps) {
+  const colors: Record<PlatformId, string> = {
+    sklik: 'from-red-600 to-red-500',
+    google: 'from-blue-500 to-green-500',
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all w-full ${
+        active ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5'
+      }`}
+    >
+      <div className={`w-6 h-6 rounded-md bg-gradient-to-br ${colors[platformId]} flex items-center justify-center`}>
+        <span className="text-[10px] font-bold text-white">{platform.name[0]}</span>
+      </div>
+      <span className="text-sm font-medium">{platform.name}</span>
+    </button>
+  )
+}
+
+// ============================================================================
+// CATEGORY TABS
+// ============================================================================
+
+interface CategoryTabsProps {
+  platform: typeof platforms[PlatformId]
+  selectedCategory: string | null
+  onCategoryChange: (category: string) => void
+}
+
+function CategoryTabs({ platform, selectedCategory, onCategoryChange }: CategoryTabsProps) {
+  const categories = Object.keys(platform.formats)
+  
+  return (
+    <div className="flex flex-wrap gap-1 px-2 py-2">
+      {categories.map((cat) => {
+        const formatCount = platform.formats[cat]?.length || 0
+        const isActive = selectedCategory === cat
+        
+        return (
+          <button
+            key={cat}
+            onClick={() => onCategoryChange(cat)}
+            className={`px-2 py-1 text-xs rounded-md transition-all ${
+              isActive
+                ? 'bg-violet-500/30 text-violet-200 border border-violet-500/50'
+                : 'bg-white/5 text-white/50 border border-transparent hover:bg-white/10'
+            }`}
+          >
+            {cat}
+            <span className="ml-1 text-[10px] opacity-60">{formatCount}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ============================================================================
+// STORAGE BAR
+// ============================================================================
+
+function StorageBar() {
+  const { creatives } = useAppStore()
+  const count = Object.keys(creatives).length
+  
+  return (
+    <div className="px-3 py-3 border-t border-white/5">
+      <div className="flex items-center justify-between text-[11px] text-white/40 mb-1.5">
+        <span className="flex items-center gap-1">
+          <HardDrive className="w-3 h-3" />
+          {count} kreativ
+        </span>
+        <span>0 B / 500 MB</span>
+      </div>
+      <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full transition-all"
+          style={{ width: '0%' }}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -166,264 +245,180 @@ export function UnifiedSidebar({
   onPlatformChange,
   onCategoryChange,
 }: SidebarProps) {
-  const { creatives } = useAppStore()
   const { profile } = useAuth()
-  const creativesCount = Object.keys(creatives).length
   const isAdmin = profile?.is_admin === true
-  
-  // Debug log pro admin status
-  console.log('🔐 Sidebar - Profile:', profile, 'isAdmin:', isAdmin)
+
+  const currentPlatformData = platforms[selectedPlatform]
 
   return (
-    <div className="w-64 h-screen flex flex-col overflow-hidden relative"
-      style={{
-        background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(2, 6, 23, 0.98) 100%)',
-        backdropFilter: 'blur(20px)',
-        borderRight: '1px solid rgba(255, 255, 255, 0.06)',
-      }}
-    >
-      {/* Gradient orbs */}
-      <div className="absolute top-0 left-0 w-32 h-32 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-20 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-      
+    <div className="w-64 h-screen flex flex-col bg-slate-950 border-r border-white/10">
       {/* Logo */}
-      <div className="relative flex items-center gap-3 px-4 py-5">
-        <div className="relative">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/25">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
-          <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 blur-lg opacity-40 animate-pulse" />
+      <div className="flex items-center gap-3 px-4 py-4">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-violet-500/25">
+          <Sparkles className="w-5 h-5 text-white" />
         </div>
         <div>
-          <div className="font-bold text-white text-base tracking-tight">AdCreative</div>
-          <div className="text-xs font-medium text-gradient">Studio Pro</div>
+          <div className="font-bold text-white text-sm">AdCreative</div>
+          <div className="text-xs font-medium bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
+            Studio Pro
+          </div>
         </div>
       </div>
 
       {/* Divider */}
-      <div className="divider mx-4 mb-2" />
+      <div className="h-px bg-white/10 mx-3" />
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 scrollbar-hide">
+      <nav className="flex-1 overflow-y-auto p-2 space-y-1">
         {/* Dashboard */}
-        <div className="mb-2">
-          <SidebarItem
-            icon={<LayoutDashboard className="w-5 h-5" />}
-            label="Dashboard"
-            description="Přehled a statistiky projektu"
-            active={currentView === 'dashboard'}
-            onClick={() => onViewChange('dashboard')}
-          />
-        </div>
+        <NavItem
+          icon={<LayoutDashboard className="w-5 h-5" />}
+          label="Dashboard"
+          sublabel="Přehled a statistiky"
+          active={currentView === 'dashboard'}
+          onClick={() => onViewChange('dashboard')}
+        />
 
-        {/* Generator */}
-        <SidebarSection
-          title="Generátor"
-          icon={<Wand2 className="w-5 h-5" />}
-          defaultOpen={true}
-          gradient="text-pink-400"
-        >
-          <div className="mb-2 px-3">
-            <div className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Platformy</div>
+        {/* Generator Section */}
+        <Section title="Generátor" icon={<Wand2 className="w-5 h-5" />} defaultOpen={true}>
+          <div className="px-1 py-1">
+            <div className="text-[10px] font-semibold text-white/30 uppercase tracking-wider mb-2 px-2">
+              Platformy
+            </div>
+            {(Object.keys(platforms) as PlatformId[]).map((pid) => (
+              <PlatformButton
+                key={pid}
+                platform={platforms[pid]}
+                platformId={pid}
+                active={selectedPlatform === pid}
+                onClick={() => onPlatformChange(pid)}
+              />
+            ))}
           </div>
           
-          {Object.entries(platforms).map(([platformId, platform]) => (
-            <div key={platformId} className="mb-1">
-              <button
-                onClick={() => onPlatformChange(platformId as PlatformId)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ${
-                  selectedPlatform === platformId 
-                    ? 'bg-white/10 text-white' 
-                    : 'text-white/50 hover:bg-white/5 hover:text-white/70'
-                }`}
-              >
-                <div 
-                  className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shadow-lg"
-                  style={{ 
-                    background: platformId === 'sklik' 
-                      ? 'linear-gradient(135deg, #cc0000 0%, #ff3333 100%)' 
-                      : 'linear-gradient(135deg, #4285f4 0%, #34a853 100%)',
-                    boxShadow: platformId === 'sklik' 
-                      ? '0 4px 12px rgba(204, 0, 0, 0.3)' 
-                      : '0 4px 12px rgba(66, 133, 244, 0.3)',
-                  }}
-                >
-                  {platformId === 'sklik' ? 'S' : 'G'}
-                </div>
-                <span className="flex-1 text-left text-sm font-medium">{platform.name}</span>
-                <ChevronRight className={`w-4 h-4 text-white/30 transition-transform ${
-                  selectedPlatform === platformId ? 'rotate-90' : ''
-                }`} />
-              </button>
-              
-              {selectedPlatform === platformId && (
-                <div className="ml-5 mt-1 space-y-0.5 border-l border-white/10 pl-3">
-                  {Object.entries(platform.categories).map(([catId, category]) => (
-                    <button
-                      key={catId}
-                      onClick={() => {
-                        onCategoryChange(catId)
-                        onViewChange('formats')
-                      }}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all ${
-                        selectedCategory === catId
-                          ? 'bg-violet-500/20 text-violet-300'
-                          : 'text-white/40 hover:bg-white/5 hover:text-white/60'
-                      }`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${selectedCategory === catId ? 'bg-violet-400' : 'bg-white/30'}`} />
-                      <span className="flex-1 text-left truncate">{category.name}</span>
-                      <span className="text-[10px] text-white/30 font-medium flex-shrink-0">
-                        {Object.keys(category.formats).length}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+          {/* Categories */}
+          <div className="mt-2">
+            <div className="text-[10px] font-semibold text-white/30 uppercase tracking-wider mb-1 px-3">
+              Kategorie
             </div>
-          ))}
-        </SidebarSection>
+            <CategoryTabs
+              platform={currentPlatformData}
+              selectedCategory={selectedCategory}
+              onCategoryChange={onCategoryChange}
+            />
+          </div>
+        </Section>
 
         {/* AI Tools */}
-        <SidebarSection
-          title="AI Nástroje"
-          icon={<Brain className="w-5 h-5" />}
-          badge="5"
-          gradient="text-cyan-400"
-        >
-          <SidebarItem
-            icon={<Star className="w-5 h-5" />}
+        <Section title="AI Nástroje" icon={<Brain className="w-5 h-5" />} badge="5">
+          <NavItem
+            icon={<Sparkles className="w-4 h-4" />}
             label="Creative Scoring"
-            description="AI hodnocení kvality a efektivity reklamy"
             active={currentView === 'ai-scoring'}
             onClick={() => onViewChange('ai-scoring')}
           />
-          <SidebarItem
-            icon={<FileText className="w-5 h-5" />}
+          <NavItem
+            icon={<FileText className="w-4 h-4" />}
             label="AI Copywriter"
-            description="Generování textů pro reklamy pomocí AI"
             active={currentView === 'ai-copywriter'}
             onClick={() => onViewChange('ai-copywriter')}
           />
-          <SidebarItem
-            icon={<Maximize2 className="w-5 h-5" />}
+          <NavItem
+            icon={<Maximize2 className="w-4 h-4" />}
             label="Magic Resize"
-            description="Automatický resize do všech formátů"
             active={currentView === 'ai-resize'}
             onClick={() => onViewChange('ai-resize')}
           />
-          <SidebarItem
-            icon={<Layout className="w-5 h-5" />}
+          <NavItem
+            icon={<Layout className="w-4 h-4" />}
             label="Template Library"
-            description="Knihovna předpřipravených šablon"
             active={currentView === 'ai-templates'}
             onClick={() => onViewChange('ai-templates')}
           />
-          <SidebarItem
-            icon={<ScanLine className="w-5 h-5" />}
-            label="AI Branding Kit"
-            description="Analýza webu a extrakce brand prvků"
+          <NavItem
+            icon={<Images className="w-4 h-4" />}
+            label="Brand Kit"
             active={currentView === 'ai-branding'}
             onClick={() => onViewChange('ai-branding')}
+            badge="SOON"
           />
-        </SidebarSection>
+        </Section>
 
-        {/* Video */}
-        <SidebarSection
-          title="Video Studio"
-          icon={<Video className="w-5 h-5" />}
-          gradient="text-pink-400"
-        >
-          <SidebarItem
-            icon={<Play className="w-5 h-5" />}
+        {/* Video Studio */}
+        <Section title="Video Studio" icon={<Video className="w-5 h-5" />}>
+          <NavItem
+            icon={<Play className="w-4 h-4" />}
             label="Slideshow Builder"
-            description="Vytvořit video slideshow z obrázků"
             active={currentView === 'video-slideshow'}
             onClick={() => onViewChange('video-slideshow')}
           />
-        </SidebarSection>
+        </Section>
 
         {/* Assets */}
-        <SidebarSection
-          title="Assets"
-          icon={<FolderOpen className="w-5 h-5" />}
-          defaultOpen={true}
-          gradient="text-emerald-400"
-        >
-          <SidebarItem
-            icon={<Images className="w-5 h-5" />}
+        <Section title="Assets" icon={<FolderOpen className="w-5 h-5" />} defaultOpen={true}>
+          <NavItem
+            icon={<Images className="w-4 h-4" />}
             label="Galerie"
-            description="Všechny vygenerované kreativy"
+            sublabel="Vygenerované kreativy"
             active={currentView === 'gallery'}
             onClick={() => onViewChange('gallery')}
-            badge={creativesCount > 0 ? String(creativesCount) : undefined}
           />
-        </SidebarSection>
+        </Section>
 
         {/* Preview & Export */}
-        <SidebarSection
-          title="Preview & Export"
-          icon={<Download className="w-5 h-5" />}
-          gradient="text-amber-400"
-        >
-          <SidebarItem
-            icon={<Smartphone className="w-5 h-5" />}
+        <Section title="Preview & Export" icon={<Eye className="w-5 h-5" />}>
+          <NavItem
+            icon={<Smartphone className="w-4 h-4" />}
             label="Mobile Preview"
-            description="Náhled jak bude reklama vypadat na mobilu"
             active={currentView === 'mobile-preview'}
             onClick={() => onViewChange('mobile-preview')}
           />
-          <SidebarItem
-            icon={<Edit3 className="w-5 h-5" />}
+          <NavItem
+            icon={<Edit3 className="w-4 h-4" />}
             label="Bulk Edit"
-            description="Hromadné úpravy více kreativ najednou"
             active={currentView === 'bulk-edit'}
             onClick={() => onViewChange('bulk-edit')}
           />
-          <SidebarItem
-            icon={<Download className="w-5 h-5" />}
+          <NavItem
+            icon={<Download className="w-4 h-4" />}
             label="Export"
-            description="Stáhnout kreativy jako ZIP nebo jednotlivě"
             active={currentView === 'export'}
             onClick={() => onViewChange('export')}
           />
-        </SidebarSection>
-      </nav>
+        </Section>
 
-      {/* Divider */}
-      <div className="divider mx-4 my-2" />
+        {/* Divider */}
+        <div className="h-px bg-white/10 my-2" />
 
-      {/* Bottom - Settings */}
-      <div className="px-2 space-y-1">
-        <SidebarItem
+        {/* Settings & Admin */}
+        <NavItem
           icon={<Settings className="w-5 h-5" />}
           label="Nastavení"
-          description="API klíče, storage, formáty"
+          sublabel="API klíče, storage, formáty"
           active={currentView === 'settings'}
           onClick={() => onViewChange('settings')}
         />
+        
         {isAdmin && (
-          <SidebarItem
+          <NavItem
             icon={<Shield className="w-5 h-5" />}
             label="Admin"
-            description="Správa uživatelů a statistiky"
+            sublabel="Správa uživatelů"
             active={currentView === 'admin'}
             onClick={() => onViewChange('admin')}
             badge="Admin"
           />
         )}
-      </div>
+      </nav>
 
       {/* Storage Status */}
-      <div className="px-3 py-2">
-        <StorageStatusBar />
-      </div>
+      <StorageBar />
     </div>
   )
 }
 
 // ============================================================================
-// DASHBOARD VIEW - Gradient Mesh Style
+// DASHBOARD VIEW
 // ============================================================================
 
 interface DashboardViewProps {
@@ -434,89 +429,72 @@ interface DashboardViewProps {
 
 export function DashboardView({ onViewChange, onOpenBrandKit, onExportAll }: DashboardViewProps) {
   const { creatives, selectedFormats } = useAppStore()
+  const creativesArray = Object.values(creatives)
   
-  const creativesArray = Object.values(creatives) as any[]
-  
+  const thisMonth = creativesArray.filter(c => {
+    if (!c || typeof c !== 'object') return false
+    const d = new Date((c as any).createdAt)
+    const now = new Date()
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+  }).length
+
   const stats = [
-    { 
-      label: 'Kreativy', 
-      value: creativesArray.length, 
-      icon: Images, 
-      gradient: 'from-violet-500 to-purple-600',
-      iconBg: 'stat-card-icon',
-      glow: 'shadow-violet-500/20'
-    },
-    { 
-      label: 'Formáty', 
-      value: selectedFormats.size, 
-      icon: LayoutGrid, 
-      gradient: 'from-cyan-500 to-blue-600',
-      iconBg: 'stat-card-icon-cyan',
-      glow: 'shadow-cyan-500/20'
-    },
-    { 
-      label: 'Tento měsíc', 
-      value: creativesArray.filter(c => {
-        const d = new Date(c.createdAt)
-        const now = new Date()
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      }).length, 
-      icon: Sparkles, 
-      gradient: 'from-emerald-500 to-teal-600',
-      iconBg: 'stat-card-icon-green',
-      glow: 'shadow-emerald-500/20'
-    },
+    { label: 'Kreativy', value: creativesArray.length, icon: Images, color: 'from-violet-500 to-purple-600' },
+    { label: 'Formáty', value: selectedFormats.size, icon: LayoutDashboard, color: 'from-cyan-500 to-blue-600' },
+    { label: 'Tento měsíc', value: thisMonth, icon: Sparkles, color: 'from-emerald-500 to-teal-600' },
   ]
 
   return (
-    <div className="p-8 min-h-screen mesh-gradient-static">
+    <div className="flex-1 p-8 overflow-y-auto bg-slate-950">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
         <p className="text-white/50">Vítejte zpět! Zde je přehled vašich kreativ.</p>
       </div>
-      
-      {/* Stats Grid */}
+
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {stats.map((stat, index) => (
-          <div 
+        {stats.map((stat) => (
+          <div
             key={stat.label}
-            className={`glass-card-hover p-6 ${stat.glow} animate-fade-in`}
-            style={{ animationDelay: `${index * 100}ms` }}
+            className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/[0.07] transition-colors"
           >
             <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg`}>
+              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center shadow-lg`}>
                 <stat.icon className="w-7 h-7 text-white" />
               </div>
               <div>
-                <div className="text-4xl font-bold text-white">{stat.value}</div>
-                <div className="text-sm text-white/50 font-medium">{stat.label}</div>
+                <div className="text-3xl font-bold text-white">{stat.value}</div>
+                <div className="text-sm text-white/50">{stat.label}</div>
               </div>
             </div>
           </div>
         ))}
       </div>
 
+      {/* Quick Actions & Recent */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Creatives */}
-        <div className="glass-card p-6 animate-fade-in" style={{ animationDelay: '200ms' }}>
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Images className="w-5 h-5 text-violet-400" />
+        <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-violet-400" />
             Poslední kreativy
-          </h2>
+          </h3>
           {creativesArray.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-                <Images className="w-8 h-8 text-white/30" />
-              </div>
-              <p className="text-white/50 text-sm mb-2">Zatím žádné kreativy</p>
-              <p className="text-white/30 text-xs">Začněte generovat v sekci Generátor</p>
+            <div className="text-center py-8 text-white/40">
+              <Images className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>Zatím žádné kreativy</p>
+              <p className="text-sm text-white/30 mt-1">Začněte generovat v sekci Generátor</p>
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-3">
-              {creativesArray.slice(0, 8).map((creative) => (
-                <div key={creative.id} className="aspect-square rounded-xl overflow-hidden bg-white/5 ring-1 ring-white/10 hover:ring-violet-500/50 transition-all cursor-pointer">
-                  <img src={creative.imageUrl} alt="" className="w-full h-full object-cover" />
+            <div className="space-y-2">
+              {creativesArray.slice(0, 5).map((c: any) => (
+                <div key={c.id} className="flex items-center gap-3 p-2 rounded-lg bg-white/5">
+                  <div className="w-10 h-10 rounded bg-white/10" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-white truncate">{c.name || 'Kreativa'}</div>
+                    <div className="text-xs text-white/40">{c.format?.name || 'Unknown'}</div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -524,52 +502,39 @@ export function DashboardView({ onViewChange, onOpenBrandKit, onExportAll }: Das
         </div>
 
         {/* Quick Actions */}
-        <div className="glass-card p-6 animate-fade-in" style={{ animationDelay: '300ms' }}>
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-400" />
+        <div className="p-6 rounded-2xl bg-white/5 border border-white/10">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Wand2 className="w-5 h-5 text-pink-400" />
             Rychlé akce
-          </h2>
-          <div className="space-y-3">
-            <button 
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button
               onClick={() => onViewChange?.('formats')}
-              className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-violet-500/30 transition-all duration-200 text-left group"
+              className="p-4 rounded-xl bg-violet-500/10 border border-violet-500/30 hover:bg-violet-500/20 transition-colors text-left"
             >
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/20 group-hover:scale-105 transition-transform">
-                <Wand2 className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <div className="text-white font-semibold">Generátor</div>
-                <div className="text-xs text-white/50">Vygenerujte reklamní kreativy</div>
-              </div>
-              <ArrowRight className="w-5 h-5 text-white/30 group-hover:text-violet-400 group-hover:translate-x-1 transition-all" />
+              <Wand2 className="w-6 h-6 text-violet-400 mb-2" />
+              <div className="text-sm font-medium text-white">Nová kreativa</div>
             </button>
-            
-            <button 
-              onClick={() => onOpenBrandKit?.()}
-              className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-cyan-500/30 transition-all duration-200 text-left group"
+            <button
+              onClick={() => onViewChange?.('gallery')}
+              className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 transition-colors text-left"
             >
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
-                <ScanLine className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <div className="text-white font-semibold">AI Branding Kit</div>
-                <div className="text-xs text-white/50">Extrahovat z webu barvy a texty</div>
-              </div>
-              <ArrowRight className="w-5 h-5 text-white/30 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+              <Images className="w-6 h-6 text-cyan-400 mb-2" />
+              <div className="text-sm font-medium text-white">Galerie</div>
             </button>
-            
-            <button 
-              onClick={() => onExportAll?.()}
-              className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-emerald-500/30 transition-all duration-200 text-left group"
+            <button
+              onClick={() => onOpenBrandKit?.() || onViewChange?.('ai-branding')}
+              className="p-4 rounded-xl bg-pink-500/10 border border-pink-500/30 hover:bg-pink-500/20 transition-colors text-left"
             >
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                <Download className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <div className="text-white font-semibold">Exportovat vše</div>
-                <div className="text-xs text-white/50">Stáhnout všechny kreativy jako ZIP</div>
-              </div>
-              <ArrowRight className="w-5 h-5 text-white/30 group-hover:text-emerald-400 group-hover:translate-x-1 transition-all" />
+              <Images className="w-6 h-6 text-pink-400 mb-2" />
+              <div className="text-sm font-medium text-white">Brand Kit</div>
+            </button>
+            <button
+              onClick={() => onExportAll?.() || onViewChange?.('export')}
+              className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left"
+            >
+              <Download className="w-6 h-6 text-emerald-400 mb-2" />
+              <div className="text-sm font-medium text-white">Export</div>
             </button>
           </div>
         </div>
@@ -577,3 +542,5 @@ export function DashboardView({ onViewChange, onOpenBrandKit, onExportAll }: Das
     </div>
   )
 }
+
+export default UnifiedSidebar
