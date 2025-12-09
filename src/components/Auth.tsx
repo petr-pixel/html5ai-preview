@@ -19,9 +19,8 @@ import {
   type UserProfile,
 } from '@/lib/supabase'
 
-// Check if Supabase is configured
-const SUPABASE_READY = isSupabaseConfigured()
-import { LandingPage } from './LandingPage'
+// SUPABASE_READY check removed for demo mode
+// import { LandingPage } from './LandingPage'
 import {
   X,
   Mail,
@@ -72,164 +71,42 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showAuth, setShowAuth] = useState<'login' | 'register' | 'forgot' | null>(null)
+  // Always logged in as Demo User
+  const [user] = useState<User | null>({
+    id: 'demo-user',
+    app_metadata: {},
+    user_metadata: {},
+    aud: 'authenticated',
+    created_at: new Date().toISOString()
+  } as User)
 
-  // Initial load
-  useEffect(() => {
-    // If Supabase is not configured, skip auth init
-    if (!SUPABASE_READY) {
-      console.warn('Supabase not configured - running in demo mode')
-      setLoading(false)
-      return
-    }
-    
-    const init = async () => {
-      try {
-        const currentUser = await getCurrentUser()
-        setUser(currentUser)
-        
-        if (currentUser) {
-          const userProfile = await getUserProfile(currentUser.id)
-          console.log('📋 Loaded profile:', userProfile)
-          setProfile(userProfile)
-        }
-      } catch (err: any) {
-        console.error('Auth init error:', err)
-        // Don't set error, just continue without auth
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    init()
-    
-    // Listen for auth changes
-    const unsubscribe = onAuthStateChange(async (user) => {
-      setUser(user)
-      if (user) {
-        try {
-          const userProfile = await getUserProfile(user.id)
-          console.log('📋 Profile on auth change:', userProfile)
-          setProfile(userProfile)
-        } catch (err) {
-          console.error('Failed to load profile:', err)
-        }
-      } else {
-        setProfile(null)
-      }
-    })
-    
-    return unsubscribe
-  }, [])
+  const [profile] = useState<UserProfile | null>({
+    id: 'demo-user',
+    email: 'demo@html5ai.cz',
+    name: 'Demo User',
+    plan: 'pro',
+    storage_used: 0,
+    storage_limit: 1073741824, // 1GB
+    created_at: new Date().toISOString()
+  })
 
-  const handleSignIn = async (email: string, password: string) => {
-    if (!SUPABASE_READY) {
-      return { error: 'Supabase není nakonfigurován. Nastavte VITE_SUPABASE_URL a VITE_SUPABASE_ANON_KEY ve Vercelu.' }
-    }
-    const { error } = await signIn(email, password)
-    if (!error) setShowAuth(null)
-    return { error }
-  }
-
-  const handleSignUp = async (email: string, password: string, name?: string) => {
-    if (!SUPABASE_READY) {
-      return { error: 'Supabase není nakonfigurován. Nastavte VITE_SUPABASE_URL a VITE_SUPABASE_ANON_KEY ve Vercelu.' }
-    }
-    const { error } = await signUp(email, password, name)
-    if (!error) setShowAuth(null)
-    return { error }
-  }
-
-  const handleSignOut = async () => {
-    await signOut()
-    setUser(null)
-    setProfile(null)
-  }
-
-  const refreshProfile = async () => {
-    if (user && SUPABASE_READY) {
-      const userProfile = await getUserProfile(user.id)
-      setProfile(userProfile)
-    }
-  }
+  // Mock functions
+  const handleSignIn = async () => ({ error: null })
+  const handleSignUp = async () => ({ error: null })
+  const handleSignOut = async () => { }
+  const refreshProfile = async () => { }
 
   const contextValue: AuthContextType = {
     user,
     profile,
-    loading,
+    loading: false,
     signIn: handleSignIn,
     signUp: handleSignUp,
     signOut: handleSignOut,
     refreshProfile,
   }
 
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-center p-4">
-          <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
-            <X className="w-8 h-8 text-red-400" />
-          </div>
-          <h2 className="text-xl font-bold text-white">Chyba inicializace</h2>
-          <p className="text-white/60 max-w-md">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-          >
-            Zkusit znovu
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-          <p className="text-white/60">Načítání...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Not logged in - show landing page
-  if (!user) {
-    return (
-      <AuthContext.Provider value={contextValue}>
-        <LandingPage
-          onLogin={() => setShowAuth('login')}
-          onRegister={() => setShowAuth('register')}
-        />
-        
-        <AnimatePresence>
-          {showAuth === 'login' || showAuth === 'register' ? (
-            <AuthModal
-              mode={showAuth}
-              onClose={() => setShowAuth(null)}
-              onSwitchMode={(mode) => setShowAuth(mode)}
-              onSignIn={handleSignIn}
-              onSignUp={handleSignUp}
-            />
-          ) : showAuth === 'forgot' ? (
-            <ForgotPasswordModal
-              onClose={() => setShowAuth(null)}
-              onBack={() => setShowAuth('login')}
-            />
-          ) : null}
-        </AnimatePresence>
-      </AuthContext.Provider>
-    )
-  }
-
-  // Logged in - render children
+  // Always render children immediately
   return (
     <AuthContext.Provider value={contextValue}>
       {children}
@@ -378,7 +255,7 @@ function AuthModal({ mode, onClose, onSwitchMode, onSignIn, onSignUp }: AuthModa
               {loading && <Loader2 className="w-5 h-5 animate-spin" />}
               {mode === 'login' ? 'Přihlásit se' : 'Vytvořit účet'}
             </button>
-            
+
             {mode === 'login' && (
               <div className="text-center">
                 <button
@@ -617,14 +494,13 @@ export function UserMenu({ onOpenSettings, onOpenSubscription }: UserMenuProps =
 
                 {/* Plan badge */}
                 <div className="mt-3 flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${
-                    profile?.plan === 'pro' ? 'bg-purple-500/20 text-purple-300' :
-                    profile?.plan === 'enterprise' ? 'bg-yellow-500/20 text-yellow-300' :
-                    'bg-white/10 text-white/60'
-                  }`}>
-                    {profile?.plan === 'pro' ? '👑 Pro' : 
-                     profile?.plan === 'enterprise' ? '🏢 Enterprise' : 
-                     'Free'}
+                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${profile?.plan === 'pro' ? 'bg-purple-500/20 text-purple-300' :
+                      profile?.plan === 'enterprise' ? 'bg-yellow-500/20 text-yellow-300' :
+                        'bg-white/10 text-white/60'
+                    }`}>
+                    {profile?.plan === 'pro' ? '👑 Pro' :
+                      profile?.plan === 'enterprise' ? '🏢 Enterprise' :
+                        'Free'}
                   </span>
                 </div>
 
@@ -636,12 +512,11 @@ export function UserMenu({ onOpenSettings, onOpenSubscription }: UserMenuProps =
                       <span>{formatStorageSize(profile.storage_used)} / {formatStorageSize(profile.storage_limit)}</span>
                     </div>
                     <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all ${
-                          storagePercent > 80 ? 'bg-red-500' :
-                          storagePercent > 50 ? 'bg-yellow-500' :
-                          'bg-green-500'
-                        }`}
+                      <div
+                        className={`h-full rounded-full transition-all ${storagePercent > 80 ? 'bg-red-500' :
+                            storagePercent > 50 ? 'bg-yellow-500' :
+                              'bg-green-500'
+                          }`}
                         style={{ width: `${storagePercent}%` }}
                       />
                     </div>
@@ -651,7 +526,7 @@ export function UserMenu({ onOpenSettings, onOpenSubscription }: UserMenuProps =
 
               {/* Menu items */}
               <div className="p-2">
-                <button 
+                <button
                   onClick={() => {
                     onOpenSettings?.()
                     setOpen(false)
@@ -661,7 +536,7 @@ export function UserMenu({ onOpenSettings, onOpenSubscription }: UserMenuProps =
                   <Settings className="w-5 h-5 text-white/40" />
                   Nastavení
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     onOpenSubscription?.()
                     setOpen(false)
@@ -683,7 +558,7 @@ export function UserMenu({ onOpenSettings, onOpenSubscription }: UserMenuProps =
 
               {/* Sign out */}
               <div className="p-2 border-t border-white/10">
-                <button 
+                <button
                   onClick={() => {
                     signOut()
                     setOpen(false)
