@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-bg: rgba(15, 17, 21, 0.7);
+    --neon-violet: #8b5cf6;
+    --neon-cyan: #06b6d4;
+  }
+  
+  body {
+    @apply bg-[#0F1115] text-white overflow-hidden;
+  }
+}
+
+@layer utilities {
+  .bg-grid-pattern {
+    background-size: 40px 40px;
+    background-image: 
+      linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  }
+  
+  .glass-panel {
+    @apply backdrop-blur-xl bg-[#0F1115]/80 border border-white/5;
+  }
+}
+
 /* ============================================================================
    GRADIENT MESH DESIGN SYSTEM
    Moderní, odvážný design s živými gradienty a glassmorphism efekty

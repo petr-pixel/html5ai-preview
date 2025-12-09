@@ -23,11 +23,11 @@ export function TextOverlayEditor({ onGenerateAI, onApplyToImage, isGenerating }
   ] as const
 
   return (
-    <div className="bg-secondary rounded-xl p-4 border border-border">
+    <div className="bg-white/5 rounded-xl p-4 border border-white/10 backdrop-blur-sm">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Type className="w-4 h-4 text-muted-foreground" />
-          <span className="font-medium text-sm">Text overlay</span>
+          <Type className="w-4 h-4 text-white/50" />
+          <span className="font-medium text-sm text-white">Text overlay</span>
         </div>
         <Switch
           checked={textOverlay.enabled}
@@ -38,8 +38,8 @@ export function TextOverlayEditor({ onGenerateAI, onApplyToImage, isGenerating }
       {textOverlay.enabled && (
         <div className="space-y-4 animate-fade-in">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">Model pro text</p>
-            <div className="inline-flex items-center rounded-full border border-border bg-background/60 p-1">
+            <p className="text-xs text-white/50">Model pro text</p>
+            <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 p-1">
               {(['cheap', 'standard', 'best'] as const).map((tier) => (
                 <button
                   key={tier}
@@ -49,7 +49,7 @@ export function TextOverlayEditor({ onGenerateAI, onApplyToImage, isGenerating }
                     'px-2.5 py-1 rounded-full text-[11px] font-medium flex items-center gap-1 transition-all',
                     textModelTier === tier
                       ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:bg-muted'
+                      : 'text-white/40 hover:bg-white/10'
                   )}
                 >
                   <span>
@@ -59,32 +59,33 @@ export function TextOverlayEditor({ onGenerateAI, onApplyToImage, isGenerating }
                     {tier === 'cheap'
                       ? 'Levný'
                       : tier === 'standard'
-                      ? 'Standard'
-                      : 'Nejlepší'}
+                        ? 'Standard'
+                        : 'Nejlepší'}
                   </span>
                 </button>
               ))}
             </div>
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[11px] text-white/30">
             Odhad ceny za dotaz: 💸 ~0,0005 $ • ⚡ ~0,001–0,002 $ • 👑 ~0,005 $+
           </p>
 
           {/* Headline */}
           <div className="space-y-2">
-            <label className="text-xs text-muted-foreground">Headline</label>
+            <label className="text-xs text-white/50">Headline</label>
             <div className="flex gap-2">
               <Input
                 value={textOverlay.headline}
                 onChange={(e) => setTextOverlay({ headline: e.target.value })}
                 placeholder="Zimní výprodej -50%"
-                className="flex-1"
+                className="flex-1 bg-white/5 border-white/10 text-white placeholder:text-white/20"
               />
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="icon"
                 onClick={() => onGenerateAI('headline')}
                 disabled={isGenerating}
+                className="hover:bg-white/10 text-white/70 hover:text-white"
               >
                 <Wand2 className="w-4 h-4" />
               </Button>
@@ -141,10 +142,10 @@ export function TextOverlayEditor({ onGenerateAI, onApplyToImage, isGenerating }
             <select
               value={textOverlay.position}
               onChange={(e) => setTextOverlay({ position: e.target.value as typeof textOverlay.position })}
-              className="w-full px-3 py-2 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary"
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-violet-500 text-white"
             >
               {positions.map((pos) => (
-                <option key={pos.value} value={pos.value}>
+                <option key={pos.value} value={pos.value} className="bg-[#0F1115]">
                   {pos.label}
                 </option>
               ))}

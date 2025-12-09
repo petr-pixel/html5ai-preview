@@ -21,9 +21,9 @@ import { outpaintWithOffset, checkNeedsOutpainting } from '@/lib/outpaint'
 import { Button } from '@/components/ui'
 import { CostBadge, calculateCost } from '@/components/CostEstimate'
 import { cn } from '@/lib/utils'
-import { 
-  X, RotateCcw, Eye, EyeOff, Minus, Plus, Type, Wand2, Loader2, 
-  Sparkles, MousePointer2, AlignLeft, AlignCenter, AlignRight, Check, 
+import {
+  X, RotateCcw, Eye, EyeOff, Minus, Plus, Type, Wand2, Loader2,
+  Sparkles, MousePointer2, AlignLeft, AlignCenter, AlignRight, Check,
   Undo2, Redo2, Anchor, Move, Lock, Unlock, AlertTriangle
 } from 'lucide-react'
 import type { Format, TextLayer, TextElement, CTAElement, LogoElement, BrandKit } from '@/types'
@@ -48,18 +48,18 @@ function createDefaultTextLayer(format: Format, texts: { headline: string; subhe
   const { width, height } = format
   const base = Math.min(width, height)
   const ratio = width / height
-  
+
   const headlineSize = Math.round(Math.max(16, Math.min(72, base * 0.07)))
   const subSize = Math.round(Math.max(12, Math.min(36, base * 0.04)))
   const ctaSize = Math.round(Math.max(12, Math.min(28, base * 0.035)))
-  
+
   const primaryColor = brandKit?.primaryColor || texts.ctaColor || '#f97316'
   const textColor = brandKit?.textLight || '#ffffff'
-  
+
   // Pozice podle poměru stran
   const isWide = ratio > 2
   const isTall = ratio < 0.7
-  
+
   return {
     headline: {
       text: texts.headline || '',
@@ -132,16 +132,16 @@ interface DraggableProps {
 function Draggable({ x, y, children, onMove, onMoveEnd, isSelected, onSelect, disabled, label, color = 'blue' }: DraggableProps) {
   const ref = useRef<HTMLDivElement>(null)
   const dragState = useRef({ active: false, startX: 0, startY: 0, elemX: 0, elemY: 0 })
-  
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (disabled) return
     e.preventDefault()
     e.stopPropagation()
     onSelect()
-    
+
     const container = ref.current?.parentElement
     if (!container) return
-    
+
     dragState.current = {
       active: true,
       startX: e.clientX,
@@ -149,7 +149,7 @@ function Draggable({ x, y, children, onMove, onMoveEnd, isSelected, onSelect, di
       elemX: x,
       elemY: y
     }
-    
+
     const handleMove = (e: MouseEvent) => {
       if (!dragState.current.active) return
       const rect = container.getBoundingClientRect()
@@ -159,18 +159,18 @@ function Draggable({ x, y, children, onMove, onMoveEnd, isSelected, onSelect, di
       const newY = Math.max(2, Math.min(98, dragState.current.elemY + (dy / rect.height) * 100))
       onMove(newX, newY)
     }
-    
+
     const handleUp = () => {
       dragState.current.active = false
       onMoveEnd()
       window.removeEventListener('mousemove', handleMove)
       window.removeEventListener('mouseup', handleUp)
     }
-    
+
     window.addEventListener('mousemove', handleMove)
     window.addEventListener('mouseup', handleUp)
   }, [x, y, onMove, onMoveEnd, onSelect, disabled])
-  
+
   return (
     <div
       ref={ref}
@@ -204,23 +204,23 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
     formatOffsets, setFormatOffset,
     perFormatTextLayers, setPerFormatTextLayer,
   } = useAppStore()
-  
+
   const brandKit = brandKits.find(b => b.id === activeBrandKit)
-  
+
   // ==========================================================================
   // STATE
   // ==========================================================================
-  
+
   // Text layer
   const [textLayer, setTextLayer] = useState<TextLayer>(() => {
     const saved = perFormatTextLayers[formatKey]
     if (saved) return saved as TextLayer
     return createDefaultTextLayer(format, textOverlay, brandKit)
   })
-  
+
   // Image offset (procenta, -50 až +50)
   const [offset, setOffset] = useState(() => formatOffsets[formatKey] || { x: 0, y: 0 })
-  
+
   // Editor state
   const [selected, setSelected] = useState<'image' | 'headline' | 'subheadline' | 'cta' | 'logo' | null>(null)
   const [editing, setEditing] = useState<'headline' | 'subheadline' | 'cta' | null>(null)
@@ -229,30 +229,30 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
   const [isSaving, setIsSaving] = useState(false)
   const [needsOutpaint, setNeedsOutpaint] = useState(false)
   const [emptyAreas, setEmptyAreas] = useState({ top: 0, bottom: 0, left: 0, right: 0 })
-  
+
   // Outpainted image
   const outpaintedImage = outpaintedImages[formatKey] || null
-  
+
   // Display
   const maxWidth = 550
   const scale = Math.min(1, maxWidth / format.width)
   const displayW = format.width * scale
   const displayH = format.height * scale
-  
+
   // Refs
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  
+
   // ==========================================================================
   // CHECK OUTPAINTING NEEDS
   // ==========================================================================
-  
+
   useEffect(() => {
     if (!sourceImage || outpaintedImage) {
       setNeedsOutpaint(false)
       return
     }
-    
+
     checkNeedsOutpainting(sourceImage, format.width, format.height, offset.x, offset.y)
       .then(result => {
         setNeedsOutpaint(result.needs)
@@ -260,18 +260,18 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
       })
       .catch(() => setNeedsOutpaint(false))
   }, [sourceImage, format, offset, outpaintedImage])
-  
+
   // ==========================================================================
   // IMAGE DRAG
   // ==========================================================================
-  
+
   const imageDragState = useRef({ active: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 })
-  
+
   const handleImageMouseDown = useCallback((e: React.MouseEvent) => {
     if (locked || outpaintedImage) return
     e.preventDefault()
     setSelected('image')
-    
+
     imageDragState.current = {
       active: true,
       startX: e.clientX,
@@ -279,7 +279,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
       offsetX: offset.x,
       offsetY: offset.y
     }
-    
+
     const handleMove = (e: MouseEvent) => {
       if (!imageDragState.current.active) return
       const dx = e.clientX - imageDragState.current.startX
@@ -289,33 +289,33 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
         y: Math.max(-50, Math.min(50, imageDragState.current.offsetY + dy * 0.15))
       })
     }
-    
+
     const handleUp = () => {
       imageDragState.current.active = false
       window.removeEventListener('mousemove', handleMove)
       window.removeEventListener('mouseup', handleUp)
     }
-    
+
     window.addEventListener('mousemove', handleMove)
     window.addEventListener('mouseup', handleUp)
   }, [locked, outpaintedImage, offset])
-  
+
   // ==========================================================================
   // ACTIONS
   // ==========================================================================
-  
+
   // Ukotvit pozici
   const handleLock = useCallback(() => {
     setFormatOffset(formatKey, offset)
     setLocked(true)
   }, [formatKey, offset, setFormatOffset])
-  
+
   // Odemknout
   const handleUnlock = useCallback(() => {
     setLocked(false)
     clearOutpaintedImage(formatKey)
   }, [formatKey, clearOutpaintedImage])
-  
+
   // Layout preset
   const applyLayoutPreset = useCallback((presetId: string) => {
     const ratio = format.width / format.height
@@ -324,7 +324,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
     const hSize = Math.round(Math.max(16, Math.min(72, base * 0.07)))
     const sSize = Math.round(Math.max(12, Math.min(36, base * 0.04)))
     const cSize = Math.round(Math.max(12, Math.min(28, base * 0.035)))
-    
+
     const presets: Record<string, Partial<TextLayer>> = {
       'bottom-left': {
         headline: { x: 8, y: 55, textAlign: 'left' as const, fontSize: hSize },
@@ -363,10 +363,10 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
         logo: { x: 8, y: 50, width: 10 },
       },
     }
-    
+
     const preset = presets[presetId]
     if (!preset) return
-    
+
     setTextLayer(prev => ({
       headline: { ...prev.headline, ...(preset.headline || {}) },
       subheadline: { ...prev.subheadline, ...(preset.subheadline || {}) },
@@ -374,7 +374,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
       logo: { ...prev.logo, ...(preset.logo || {}) },
     }))
   }, [format])
-  
+
   // Dopočítat pozadí
   const handleOutpaint = useCallback(async () => {
     // DALL-E 2 outpainting (stejný OpenAI klíč), nebo blur fallback bez klíče
@@ -382,15 +382,15 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
       alert('Chybí zdrojový obrázek')
       return
     }
-    
+
     if (!apiKeys.openai) {
       // Upozornění že použijeme blur fallback
       const proceed = confirm('Nemáte nastavený OpenAI API klíč. Použije se blur fallback (rozmazané pozadí). Pro AI outpainting nastavte klíč v Settings. Pokračovat?')
       if (!proceed) return
     }
-    
+
     setIsOutpainting(true)
-    
+
     try {
       const result = await outpaintWithOffset({
         openaiKey: apiKeys.openai,
@@ -400,7 +400,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
         offsetX: offset.x,
         offsetY: offset.y
       })
-      
+
       if (result.success && result.image) {
         setOutpaintedImage(formatKey, result.image)
         setLocked(true)
@@ -419,23 +419,23 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
       setIsOutpainting(false)
     }
   }, [sourceImage, apiKeys.openai, format, offset, formatKey, setOutpaintedImage])
-  
+
   // Render to canvas
   const renderToCanvas = useCallback(async (): Promise<string> => {
     const canvas = canvasRef.current
     if (!canvas) return ''
-    
+
     const displayImg = outpaintedImage || sourceImage
     if (!displayImg) return ''
-    
+
     canvas.width = format.width
     canvas.height = format.height
     const ctx = canvas.getContext('2d')!
-    
+
     // Background
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, format.width, format.height)
-    
+
     // Image
     await new Promise<void>((resolve) => {
       const img = new Image()
@@ -448,7 +448,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
           // Calculate placement with offset
           const srcRatio = img.width / img.height
           const tgtRatio = format.width / format.height
-          
+
           let drawW, drawH, drawX, drawY
           if (srcRatio > tgtRatio) {
             drawH = format.height
@@ -468,23 +468,23 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
       img.onerror = () => resolve()
       img.src = displayImg
     })
-    
+
     // Text layers
     const drawText = (el: TextElement, isCTA = false) => {
       if (!el.visible || !el.text) return
       const x = (el.x / 100) * format.width
       const y = (el.y / 100) * format.height
-      
+
       ctx.font = `${el.fontWeight} ${el.fontSize}px Arial, sans-serif`
       ctx.textAlign = el.textAlign
       ctx.textBaseline = 'middle'
-      
+
       if (el.shadow) {
         ctx.shadowColor = 'rgba(0,0,0,0.8)'
         ctx.shadowBlur = 4
         ctx.shadowOffsetY = 2
       }
-      
+
       if (isCTA) {
         const cta = el as CTAElement
         const tw = ctx.measureText(el.text).width
@@ -493,24 +493,24 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
         let boxX = x
         if (el.textAlign === 'center') boxX = x - boxW / 2
         else if (el.textAlign === 'right') boxX = x - boxW
-        
+
         ctx.shadowColor = 'transparent'
         ctx.fillStyle = cta.backgroundColor
         ctx.beginPath()
         ctx.roundRect(boxX, y - boxH / 2, boxW, boxH, cta.borderRadius)
         ctx.fill()
       }
-      
+
       ctx.fillStyle = el.color
       ctx.fillText(el.text, x, y)
       ctx.shadowColor = 'transparent'
       ctx.shadowBlur = 0
     }
-    
+
     drawText(textLayer.headline)
     drawText(textLayer.subheadline)
     drawText(textLayer.cta, true)
-    
+
     // Logo
     if (textLayer.logo.visible && brandKit?.logoMain) {
       await new Promise<void>((resolve) => {
@@ -530,20 +530,20 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
         logo.src = brandKit.logoMain!
       })
     }
-    
+
     return canvas.toDataURL('image/png')
   }, [sourceImage, outpaintedImage, format, offset, textLayer, brandKit])
-  
+
   // Save
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
       const rendered = await renderToCanvas()
       if (!rendered) throw new Error('Render failed')
-      
+
       setFormatOffset(formatKey, offset)
       setPerFormatTextLayer(formatKey, textLayer)
-      
+
       // Předat textLayer a rendered do parent komponenty
       // Parent (AppContent) se postará o uložení do store
       onSave?.(textLayer, rendered)
@@ -555,7 +555,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
       setIsSaving(false)
     }
   }, [renderToCanvas, formatKey, offset, textLayer, setFormatOffset, setPerFormatTextLayer, onSave, onClose])
-  
+
   // Reset
   const handleReset = useCallback(() => {
     setTextLayer(createDefaultTextLayer(format, textOverlay, brandKit))
@@ -566,19 +566,19 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
     setSelected(null)
     setEditing(null)
   }, [format, textOverlay, brandKit, formatKey, setFormatOffset, clearOutpaintedImage])
-  
+
   // ==========================================================================
   // HELPERS
   // ==========================================================================
-  
+
   const updateText = useCallback((type: 'headline' | 'subheadline' | 'cta', updates: Partial<TextElement | CTAElement>) => {
     setTextLayer(prev => ({ ...prev, [type]: { ...prev[type], ...updates } }))
   }, [])
-  
+
   const updateLogo = useCallback((updates: Partial<LogoElement>) => {
     setTextLayer(prev => ({ ...prev, logo: { ...prev.logo, ...updates } }))
   }, [])
-  
+
   // Compute image display style
   const imageStyle = useMemo(() => {
     if (outpaintedImage) {
@@ -595,32 +595,32 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
       height: 'auto',
     }
   }, [outpaintedImage, offset])
-  
+
   // ==========================================================================
   // RENDER
   // ==========================================================================
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-[#1a1d24] border border-white/10 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div>
-            <h2 className="text-lg font-semibold">{format.name}</h2>
-            <p className="text-sm text-gray-500">{format.width} × {format.height}px</p>
+            <h2 className="text-lg font-semibold text-white">{format.name}</h2>
+            <p className="text-sm text-gray-400">{format.width} × {format.height}px</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-white/70 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
-        
+
         <div className="flex">
           {/* Canvas area */}
-          <div className="flex-1 p-6 bg-gray-100 flex flex-col items-center" onClick={() => { setSelected(null); setEditing(null) }}>
+          <div className="flex-1 p-6 bg-black/20 flex flex-col items-center justify-center" onClick={() => { setSelected(null); setEditing(null) }}>
             {/* Canvas */}
             <div
               ref={containerRef}
-              className="relative bg-white shadow-lg overflow-hidden"
+              className="relative bg-[#0F1115] shadow-2xl overflow-hidden border border-white/5"
               style={{ width: displayW, height: displayH }}
             >
               {/* Empty area indicators */}
@@ -644,7 +644,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                   )}
                 </>
               )}
-              
+
               {/* Image */}
               {(sourceImage || outpaintedImage) && (
                 <div
@@ -664,7 +664,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                     style={outpaintedImage ? undefined : imageStyle}
                     draggable={false}
                   />
-                  
+
                   {/* Status badge */}
                   {!outpaintedImage && (
                     <div className={cn(
@@ -674,7 +674,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                       {locked ? <><Lock className="w-3 h-3" /> Ukotveno</> : <><Move className="w-3 h-3" /> Táhni obrázek</>}
                     </div>
                   )}
-                  
+
                   {outpaintedImage && (
                     <div className="absolute top-2 left-2 text-xs px-2 py-1 rounded flex items-center gap-1 bg-green-500 text-white">
                       <Sparkles className="w-3 h-3" /> Pozadí hotovo
@@ -682,14 +682,14 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                   )}
                 </div>
               )}
-              
+
               {/* Text elements */}
               {textLayer.headline.visible && (
                 <Draggable
                   x={textLayer.headline.x}
                   y={textLayer.headline.y}
                   onMove={(x, y) => updateText('headline', { x, y })}
-                  onMoveEnd={() => {}}
+                  onMoveEnd={() => { }}
                   isSelected={selected === 'headline'}
                   onSelect={() => setSelected('headline')}
                   label="Headline"
@@ -721,13 +721,13 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                   )}
                 </Draggable>
               )}
-              
+
               {textLayer.subheadline.visible && (
                 <Draggable
                   x={textLayer.subheadline.x}
                   y={textLayer.subheadline.y}
                   onMove={(x, y) => updateText('subheadline', { x, y })}
-                  onMoveEnd={() => {}}
+                  onMoveEnd={() => { }}
                   isSelected={selected === 'subheadline'}
                   onSelect={() => setSelected('subheadline')}
                   label="Subheadline"
@@ -757,13 +757,13 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                   )}
                 </Draggable>
               )}
-              
+
               {textLayer.cta.visible && (
                 <Draggable
                   x={textLayer.cta.x}
                   y={textLayer.cta.y}
                   onMove={(x, y) => updateText('cta', { x, y })}
-                  onMoveEnd={() => {}}
+                  onMoveEnd={() => { }}
                   isSelected={selected === 'cta'}
                   onSelect={() => setSelected('cta')}
                   label="CTA"
@@ -795,13 +795,13 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                   )}
                 </Draggable>
               )}
-              
+
               {textLayer.logo.visible && brandKit?.logoMain && (
                 <Draggable
                   x={textLayer.logo.x}
                   y={textLayer.logo.y}
                   onMove={(x, y) => updateLogo({ x, y })}
-                  onMoveEnd={() => {}}
+                  onMoveEnd={() => { }}
                   isSelected={selected === 'logo'}
                   onSelect={() => setSelected('logo')}
                   label="Logo"
@@ -816,7 +816,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                 </Draggable>
               )}
             </div>
-            
+
             {/* Action buttons */}
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {/* Step 1-2: Position & Lock */}
@@ -835,7 +835,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                   )}
                 </>
               )}
-              
+
               {/* Step 3: Outpaint */}
               {needsOutpaint && locked && !outpaintedImage && (
                 <Button
@@ -853,7 +853,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                   )}
                 </Button>
               )}
-              
+
               {/* Info if no API key */}
               {needsOutpaint && locked && !outpaintedImage && !apiKeys.openai && (
                 <span className="text-xs text-blue-600 flex items-center gap-1">
@@ -861,14 +861,14 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                   Použije se blur fallback (bez OpenAI klíče)
                 </span>
               )}
-              
+
               <span className="text-xs text-gray-500">
                 <MousePointer2 className="w-3 h-3 inline mr-1" />
                 Dvojklik = edit textu
               </span>
             </div>
           </div>
-          
+
           {/* Sidebar */}
           <div className="w-80 border-l p-5 overflow-y-auto max-h-[calc(95vh-80px)] bg-gray-50">
             {/* Layout Presets */}
@@ -894,7 +894,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                 ))}
               </div>
             </div>
-            
+
             {/* Layers */}
             <div className="mb-5">
               <h3 className="text-sm font-semibold mb-2 text-gray-700 flex items-center gap-2">
@@ -911,9 +911,9 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                     className={cn(
                       'w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-colors',
                       textLayer[type].visible
-                        ? type === 'headline' ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                        ? type === 'headline' ? 'bg-blue-50 border-blue-200 text-blue-700'
                           : type === 'subheadline' ? 'bg-green-50 border-green-200 text-green-700'
-                          : 'bg-orange-50 border-orange-200 text-orange-700'
+                            : 'bg-orange-50 border-orange-200 text-orange-700'
                         : 'bg-white border-gray-200 text-gray-400'
                     )}
                   >
@@ -938,7 +938,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                 </button>
               </div>
             </div>
-            
+
             {/* Selected element properties */}
             {selected && selected !== 'image' && selected !== 'logo' && textLayer[selected].visible && (
               <div className="mb-5 p-4 bg-white rounded-xl border shadow-sm">
@@ -1035,7 +1035,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                 </div>
               </div>
             )}
-            
+
             {selected === 'logo' && textLayer.logo.visible && (
               <div className="mb-5 p-4 bg-purple-50 rounded-xl border border-purple-200">
                 <h4 className="text-sm font-semibold mb-3 text-purple-700">🏷️ Logo</h4>
@@ -1072,7 +1072,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
                 </div>
               </div>
             )}
-            
+
             {/* Keyboard shortcuts */}
             <div className="mb-5 p-3 bg-gray-100 rounded-lg text-xs text-gray-500 space-y-1">
               <p><kbd className="bg-white px-1 rounded border">Delete</kbd> = skrýt prvek</p>
@@ -1080,7 +1080,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
               <p><kbd className="bg-white px-1 rounded border">+/-</kbd> = velikost</p>
               <p><kbd className="bg-white px-1 rounded border">Dvojklik</kbd> = editace textu</p>
             </div>
-            
+
             {/* Actions */}
             <div className="space-y-2 pt-4 border-t border-gray-200">
               <Button variant="outline" onClick={handleReset} className="w-full">
@@ -1098,7 +1098,7 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
             </div>
           </div>
         </div>
-        
+
         <canvas ref={canvasRef} className="hidden" />
       </div>
     </div>

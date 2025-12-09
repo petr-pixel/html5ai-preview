@@ -13,6 +13,7 @@ import { platforms, getFormatKey, getCategoryType, isBrandingCategory, isVideoCa
 import { generateId, cn, loadImage, drawRoundedRect } from '@/lib/utils'
 import { outpaintImage } from '@/lib/openai-client'
 import { UnifiedSidebar, DashboardView, type ViewType } from '@/components/UnifiedSidebar'
+import { DesktopLayout } from '@/layouts/DesktopLayout'
 import { SettingsModal } from '@/components/SettingsModal'
 import { FormatCard } from '@/components/FormatCard'
 import { TextOverlayEditor } from '@/components/TextOverlayEditor'
@@ -61,7 +62,7 @@ import type { Creative, TextOverlay, PlatformId, CategoryType } from '@/types'
 
 function buildEnhancedPrompt(userPrompt: string, format: 'landscape' | 'square' | 'portrait'): string {
   // GPT-4o works better with natural language prompts, less keyword stuffing
-  
+
   // Detekce typu obsahu z promptu
   const isProduct = /produkt|product|zboží|goods|item|věc/i.test(userPrompt)
   const isLifestyle = /lifestyle|život|living|people|lidé|osoba|člověk/i.test(userPrompt)
@@ -69,17 +70,17 @@ function buildEnhancedPrompt(userPrompt: string, format: 'landscape' | 'square' 
   const isTech = /tech|software|app|digital|mobil|phone|computer|laptop/i.test(userPrompt)
   const isNature = /příroda|nature|outdoor|hory|mountain|moře|sea|les|forest|lyž/i.test(userPrompt)
   const isFashion = /móda|fashion|oblečení|clothes|style|styl/i.test(userPrompt)
-  
+
   // Kompozice podle formátu
-  const compositionHint = format === 'landscape' 
+  const compositionHint = format === 'landscape'
     ? "Use wide cinematic framing with space on the sides for text overlay."
     : format === 'portrait'
-    ? "Use vertical composition with the main subject centered, leaving space at top or bottom for text."
-    : "Use balanced square composition with the subject centered."
-  
+      ? "Use vertical composition with the main subject centered, leaving space at top or bottom for text."
+      : "Use balanced square composition with the subject centered."
+
   // Styl podle typu obsahu
   let styleHint = ""
-  
+
   if (isNature || userPrompt.toLowerCase().includes('lyž')) {
     styleHint = "Capture the scene like a professional outdoor/adventure photographer. Natural lighting, vivid colors, dynamic composition that conveys energy and excitement."
   } else if (isProduct) {
@@ -95,7 +96,7 @@ function buildEnhancedPrompt(userPrompt: string, format: 'landscape' | 'square' 
   } else {
     styleHint = "Professional advertising photography with perfect lighting, compelling composition, and premium quality suitable for a major brand campaign."
   }
-  
+
   // Sestavení promptu pro GPT-4o - přirozený jazyk
   return `${userPrompt}
 
@@ -113,7 +114,7 @@ Technical requirements: Photorealistic, sharp focus, professional color grading.
 export function AppContent() {
   // Storage synchronization
   useStorageSync()
-  
+
   // Navigation state
   const [currentView, setCurrentView] = useState<ViewType>('dashboard')
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -178,9 +179,9 @@ export function AppContent() {
   const currentCategory = currentPlatform?.categories[category]
   const categoryType = getCategoryType(platform, category)
   const maxSizeKB = getMaxSizeKB(platform, category)
-  
-  const currentBrandKit = activeBrandKit 
-    ? brandKits.find(kit => kit.id === activeBrandKit) 
+
+  const currentBrandKit = activeBrandKit
+    ? brandKits.find(kit => kit.id === activeBrandKit)
     : brandKits.find(kit => kit.isDefault)
 
   // ============================================================================
@@ -211,13 +212,13 @@ export function AppContent() {
 
     try {
       // GPT-4o image generation - supported sizes
-      const size = sourceFormat === 'landscape' ? '1536x1024' 
-                 : sourceFormat === 'portrait' ? '1024x1536' 
-                 : '1024x1024'
+      const size = sourceFormat === 'landscape' ? '1536x1024'
+        : sourceFormat === 'portrait' ? '1024x1536'
+          : '1024x1024'
 
       // Build professional prompt
       const enhancedPrompt = buildEnhancedPrompt(prompt, sourceFormat)
-      
+
       console.log('Generating with GPT-4o:', { size, quality: imageModelTier, prompt: enhancedPrompt })
 
       const res = await fetch('https://api.openai.com/v1/images/generations', {
@@ -236,12 +237,12 @@ export function AppContent() {
       })
 
       setProgress(60)
-      
+
       if (!res.ok) {
         const errorData = await res.json()
         throw new Error(errorData.error?.message || `API error: ${res.status}`)
       }
-      
+
       const data = await res.json()
       console.log('GPT-4o response:', data)
 
@@ -250,17 +251,17 @@ export function AppContent() {
       if (b64) {
         const imageUrl = `data:image/png;base64,${b64}`
         setSourceImage(imageUrl)
-        
+
         // Uložit do galerie jako "zdrojový" obrázek
         const sourceCreative: Creative = {
           id: generateId(),
           formatKey: `source-${sourceFormat}`,
           platform: platform,
           category: 'source',
-          format: { 
-            width: sourceFormat === 'landscape' ? 1536 : sourceFormat === 'portrait' ? 1024 : 1024, 
-            height: sourceFormat === 'landscape' ? 1024 : sourceFormat === 'portrait' ? 1536 : 1024, 
-            name: `AI Source (${sourceFormat})` 
+          format: {
+            width: sourceFormat === 'landscape' ? 1536 : sourceFormat === 'portrait' ? 1024 : 1024,
+            height: sourceFormat === 'landscape' ? 1024 : sourceFormat === 'portrait' ? 1536 : 1024,
+            name: `AI Source (${sourceFormat})`
           },
           imageUrl: imageUrl,
           createdAt: new Date(),
@@ -268,7 +269,7 @@ export function AppContent() {
           isSource: true,
         }
         addCreatives([sourceCreative])
-        
+
         setProgress(100)
         return
       }
@@ -277,17 +278,17 @@ export function AppContent() {
       const url = data?.data?.[0]?.url
       if (url) {
         setSourceImage(url)
-        
+
         // Uložit do galerie
         const sourceCreative: Creative = {
           id: generateId(),
           formatKey: `source-${sourceFormat}`,
           platform: platform,
           category: 'source',
-          format: { 
-            width: sourceFormat === 'landscape' ? 1536 : sourceFormat === 'portrait' ? 1024 : 1024, 
-            height: sourceFormat === 'landscape' ? 1024 : sourceFormat === 'portrait' ? 1536 : 1024, 
-            name: `AI Source (${sourceFormat})` 
+          format: {
+            width: sourceFormat === 'landscape' ? 1536 : sourceFormat === 'portrait' ? 1024 : 1024,
+            height: sourceFormat === 'landscape' ? 1024 : sourceFormat === 'portrait' ? 1536 : 1024,
+            name: `AI Source (${sourceFormat})`
           },
           imageUrl: url,
           createdAt: new Date(),
@@ -295,7 +296,7 @@ export function AppContent() {
           isSource: true,
         }
         addCreatives([sourceCreative])
-        
+
         setProgress(100)
         return
       }
@@ -357,9 +358,8 @@ export function AppContent() {
           messages: [
             {
               role: 'user',
-              content: `Napiš ${
-                field === 'headline' ? 'krátký reklamní headline (max 5 slov)' : 'krátký podtitulek (max 8 slov)'
-              } pro reklamu: "${prompt}". Pouze text, žádné uvozovky.`,
+              content: `Napiš ${field === 'headline' ? 'krátký reklamní headline (max 5 slov)' : 'krátký podtitulek (max 8 slov)'
+                } pro reklamu: "${prompt}". Pouze text, žádné uvozovky.`,
             },
           ],
         }),
@@ -392,24 +392,24 @@ export function AppContent() {
 
     try {
       const img = await loadImage(sourceImage)
-      
+
       const canvas = document.createElement('canvas')
       canvas.width = img.width
       canvas.height = img.height
       const ctx = canvas.getContext('2d')!
-      
+
       // Draw original image
       ctx.drawImage(img, 0, 0)
-      
+
       // Draw text overlay
       const padding = Math.min(img.width, img.height) * 0.04
       const pos = textOverlay.position
-      
+
       // Calculate text position
       let textX = padding
       let textY = img.height - padding
       let textAlign: CanvasTextAlign = 'left'
-      
+
       if (pos.includes('right')) {
         textX = img.width - padding
         textAlign = 'right'
@@ -417,22 +417,22 @@ export function AppContent() {
         textX = img.width / 2
         textAlign = 'center'
       }
-      
+
       if (pos.includes('top')) {
         textY = padding + 40
       } else if (pos === 'center') {
         textY = img.height / 2
       }
-      
+
       ctx.textAlign = textAlign
-      
+
       // Font sizes relative to image
       const headlineSize = Math.max(24, img.width * 0.05)
       const subheadlineSize = Math.max(16, img.width * 0.03)
       const ctaSize = Math.max(14, img.width * 0.025)
-      
+
       let currentY = textY
-      
+
       // CTA button
       if (textOverlay.cta) {
         const ctaPadding = ctaSize * 0.6
@@ -440,23 +440,23 @@ export function AppContent() {
         const ctaMetrics = ctx.measureText(textOverlay.cta)
         const ctaWidth = ctaMetrics.width + ctaPadding * 2
         const ctaHeight = ctaSize + ctaPadding * 1.5
-        
+
         let ctaX = textX
         if (textAlign === 'right') ctaX = textX - ctaWidth
         else if (textAlign === 'center') ctaX = textX - ctaWidth / 2
-        
+
         // Button background
         ctx.fillStyle = textOverlay.ctaColor || '#f97316'
         drawRoundedRect(ctx, ctaX, currentY - ctaHeight, ctaWidth, ctaHeight, 6)
         ctx.fill()
-        
+
         // Button text
         ctx.fillStyle = '#ffffff'
         ctx.fillText(textOverlay.cta, ctaX + ctaPadding, currentY - ctaPadding)
-        
+
         currentY -= ctaHeight + 10
       }
-      
+
       // Subheadline
       if (textOverlay.subheadline) {
         ctx.font = `${subheadlineSize}px system-ui, sans-serif`
@@ -468,7 +468,7 @@ export function AppContent() {
         ctx.fillText(textOverlay.subheadline, textX, currentY)
         currentY -= subheadlineSize + 8
       }
-      
+
       // Headline
       if (textOverlay.headline) {
         ctx.font = `bold ${headlineSize}px system-ui, sans-serif`
@@ -479,15 +479,15 @@ export function AppContent() {
         ctx.shadowOffsetY = 1
         ctx.fillText(textOverlay.headline, textX, currentY)
       }
-      
+
       // Reset shadow
       ctx.shadowColor = 'transparent'
       ctx.shadowBlur = 0
-      
+
       // Update source image
       const newImageUrl = canvas.toDataURL('image/png')
       setSourceImage(newImageUrl)
-      
+
     } catch (err) {
       console.error('Error applying text:', err)
       alert('Chyba při aplikování textu')
@@ -515,23 +515,23 @@ export function AppContent() {
     try {
       const img = await loadImage(sourceImage)
       const logoImg = await loadImage(watermark.image)
-      
+
       const canvas = document.createElement('canvas')
       canvas.width = img.width
       canvas.height = img.height
       const ctx = canvas.getContext('2d')!
-      
+
       // Draw original image
       ctx.drawImage(img, 0, 0)
-      
+
       // Calculate logo size and position
       const logoWidth = (img.width * watermark.size) / 100
       const logoHeight = (logoImg.height / logoImg.width) * logoWidth
       const padding = Math.min(img.width, img.height) * 0.03
-      
+
       let logoX = padding
       let logoY = padding
-      
+
       switch (watermark.position) {
         case 'top-right':
           logoX = img.width - logoWidth - padding
@@ -553,16 +553,16 @@ export function AppContent() {
           logoX = padding
           logoY = padding
       }
-      
+
       // Draw logo with opacity
       ctx.globalAlpha = watermark.opacity
       ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight)
       ctx.globalAlpha = 1
-      
+
       // Update source image
       const newImageUrl = canvas.toDataURL('image/png')
       setSourceImage(newImageUrl)
-      
+
     } catch (err) {
       console.error('Error applying logo:', err)
       alert('Chyba při aplikování loga')
@@ -609,43 +609,43 @@ export function AppContent() {
         canvas.width = fmt.width
         canvas.height = fmt.height
         const ctx = canvas.getContext('2d')!
-        
+
         // High quality rendering
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = 'high'
 
         // Smart crop nebo základní crop
         let cropResult = { x: 0, y: 0, width: img.width, height: img.height }
-        
+
         // Pro branding typ NEPOUŽÍVAT smart crop
         const catType = getCategoryType(plat, cat)
-        
+
         // Vypočítej základní crop (center crop)
         const srcRatio = img.width / img.height
         const tgtRatio = fmt.width / fmt.height
-        
+
         // Získej offset pro tento konkrétní formát
         const formatOffset = formatOffsets[formatKey] || { x: 0, y: 0 }
-        
+
         // Zkontroluj zda máme uložený outpainted obrázek z FormatEditoru
         const savedOutpaintedImage = outpaintedImages[formatKey]
-        
+
         // Aplikuj ruční offset (v procentech, -50 až +50)
         const applyOffset = (crop: typeof cropResult) => {
           // Offset v pixelech - proporcionálně k velikosti cropu
           const maxOffsetX = (img.width - crop.width) / 2
           const maxOffsetY = (img.height - crop.height) / 2
-          
+
           const offsetX = (formatOffset.x / 50) * maxOffsetX
           const offsetY = (formatOffset.y / 50) * maxOffsetY
-          
+
           return {
             ...crop,
             x: Math.max(0, Math.min(img.width - crop.width, crop.x - offsetX)),
             y: Math.max(0, Math.min(img.height - crop.height, crop.y - offsetY)),
           }
         }
-        
+
         // Pokud máme uložený outpainted obrázek, použijeme ho přímo
         if (savedOutpaintedImage) {
           try {
@@ -676,7 +676,7 @@ export function AppContent() {
           let drawHeight = fmt.height
           let drawX = 0
           let drawY = 0
-          
+
           if (srcRatio > tgtRatio) {
             // Zdrojový je širší - přizpůsobíme šířku, výška bude menší
             drawWidth = fmt.width
@@ -688,11 +688,11 @@ export function AppContent() {
             drawWidth = fmt.height * srcRatio
             drawX = (fmt.width - drawWidth) / 2
           }
-          
+
           // Detekuj zda je potřeba outpainting (prázdné místo > 15%)
           const emptyRatio = 1 - (drawWidth * drawHeight) / (fmt.width * fmt.height)
           const needsOutpainting = emptyRatio > 0.15 && apiKeys.openai
-          
+
           if (needsOutpainting) {
             // Zkus AI outpainting pro rozšíření obrázku
             try {
@@ -705,7 +705,7 @@ export function AppContent() {
                   prompt: prompt ? `Continue the background: ${prompt}` : undefined,
                 }
               )
-              
+
               if (outpaintResult.success && outpaintResult.image) {
                 // Použij outpaintovaný obrázek
                 const outpaintedImg = await loadImage(outpaintResult.image)
@@ -717,7 +717,7 @@ export function AppContent() {
                 ctx.filter = 'none'
                 ctx.fillStyle = 'rgba(0,0,0,0.15)'
                 ctx.fillRect(0, 0, fmt.width, fmt.height)
-                
+
                 const fitOffsetX = (formatOffset.x / 50) * ((fmt.width - drawWidth) / 2)
                 const fitOffsetY = (formatOffset.y / 50) * ((fmt.height - drawHeight) / 2)
                 ctx.drawImage(img, 0, 0, img.width, img.height, drawX + fitOffsetX, drawY + fitOffsetY, drawWidth, drawHeight)
@@ -734,7 +734,7 @@ export function AppContent() {
             // Normální FIT bez outpaintingu
             ctx.fillStyle = currentBrandKit?.backgroundColor || '#ffffff'
             ctx.fillRect(0, 0, fmt.width, fmt.height)
-            
+
             const fitOffsetX = (formatOffset.x / 50) * ((fmt.width - drawWidth) / 2)
             const fitOffsetY = (formatOffset.y / 50) * ((fmt.height - drawHeight) / 2)
             ctx.drawImage(img, 0, 0, img.width, img.height, drawX + fitOffsetX, drawY + fitOffsetY, drawWidth, drawHeight)
@@ -871,7 +871,7 @@ export function AppContent() {
   const renderDashboard = () => (
     <div className="p-8">
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="card-google p-6">
           <div className="text-sm text-gray-500 mb-1">Celkem kreativ</div>
@@ -990,7 +990,7 @@ export function AppContent() {
             {/* Source Image */}
             <div className="p-4 border-b border-white/10">
               <h2 className="text-sm font-semibold text-white mb-3">Zdrojový obrázek</h2>
-              
+
               {/* Format selection */}
               <div className="flex gap-2 mb-3">
                 {(['landscape', 'square', 'portrait'] as const).map((fmt) => (
@@ -1026,7 +1026,7 @@ export function AppContent() {
                 >
                   {isGenerating ? <Spinner size={16} /> : <Wand2 className="w-4 h-4" />}
                   Generovat
-                  <CostBadge cost={calculateCost('image', { 
+                  <CostBadge cost={calculateCost('image', {
                     quality: imageModelTier === 'best' ? 'high' : imageModelTier === 'cheap' ? 'low' : 'medium',
                     size: sourceFormat === 'landscape' ? '1536x1024' : sourceFormat === 'portrait' ? '1024x1536' : '1024x1024'
                   })} />
@@ -1046,7 +1046,7 @@ export function AppContent() {
                   onChange={handleFileUpload}
                 />
               </div>
-              
+
               {/* Cost info */}
               {prompt && !sourceImage && (
                 <div className="text-xs text-white/40 mb-3 flex items-center gap-1">
@@ -1095,14 +1095,14 @@ export function AppContent() {
                     </button>
                   </div>
                   <p className="text-[10px] text-white/40 mt-1">
-                    {cropMode === 'smart' 
-                      ? 'AI detekuje hlavní objekt a ořízne' 
+                    {cropMode === 'smart'
+                      ? 'AI detekuje hlavní objekt a ořízne'
                       : 'Zachová celý obrázek (pro grafiky s textem)'
                     }
                   </p>
                 </div>
               )}
-              
+
               {/* Image Position Control */}
               {sourceImage && (
                 <div className="mt-3 pt-3 border-t border-white/10">
@@ -1114,13 +1114,13 @@ export function AppContent() {
             {/* Conditional editors based on category type */}
             {categoryType === 'image' && (
               <>
-                <TextOverlayEditor 
-                  onGenerateAI={generateAIText} 
+                <TextOverlayEditor
+                  onGenerateAI={generateAIText}
                   onApplyToImage={applyTextToSourceImage}
-                  isGenerating={isGenerating} 
+                  isGenerating={isGenerating}
                 />
                 <PerFormatTextEditor />
-                <WatermarkEditor 
+                <WatermarkEditor
                   onApplyToImage={applyLogoToSourceImage}
                   isGenerating={isGenerating}
                 />
@@ -1129,10 +1129,10 @@ export function AppContent() {
 
             {categoryType === 'branding' && (
               <>
-                <TextOverlayEditor 
-                  onGenerateAI={generateAIText} 
+                <TextOverlayEditor
+                  onGenerateAI={generateAIText}
                   onApplyToImage={applyTextToSourceImage}
-                  isGenerating={isGenerating} 
+                  isGenerating={isGenerating}
                 />
                 <PerFormatTextEditor />
                 {/* Safe Zone info */}
@@ -1143,8 +1143,8 @@ export function AppContent() {
                       <div>
                         <div className="text-sm font-medium text-amber-300">Safe Zone</div>
                         <div className="text-xs text-amber-200/70 mt-1">
-                          {currentCategory?.formats[0]?.safeZone?.description || 
-                           'Středová část může být zakrytá obsahem webu.'}
+                          {currentCategory?.formats[0]?.safeZone?.description ||
+                            'Středová část může být zakrytá obsahem webu.'}
                         </div>
                       </div>
                     </div>
@@ -1178,7 +1178,7 @@ export function AppContent() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
-                    const keys = currentCategory?.formats.map((_, i) => 
+                    const keys = currentCategory?.formats.map((_, i) =>
                       getFormatKey(platform, category, i)
                     ) || []
                     selectAllFormats(keys)
@@ -1208,7 +1208,7 @@ export function AppContent() {
                       <Sparkles className="w-4 h-4" />
                       Generovat ({selectedFormats.size})
                       {cropMode === 'fit' && selectedFormats.size > 0 && apiKeys.openai && (
-                        <CostBadge cost={calculateCost('outpaint', { 
+                        <CostBadge cost={calculateCost('outpaint', {
                           quality: 'medium',
                           count: Math.ceil(selectedFormats.size * 0.5) // ~50% formátů může potřebovat outpaint
                         })} />
@@ -1217,7 +1217,7 @@ export function AppContent() {
                   )}
                 </button>
               </div>
-              
+
               {/* Cost warning for fit mode */}
               {cropMode === 'fit' && selectedFormats.size > 0 && apiKeys.openai && (
                 <div className="text-xs text-amber-400/70 flex items-center gap-1.5 mt-2">
@@ -1261,12 +1261,12 @@ export function AppContent() {
                     )}
                   >
                     {/* Checkbox */}
-                    <div 
+                    <div
                       onClick={(e) => { e.stopPropagation(); toggleFormat(formatKey) }}
                       className={cn(
                         'absolute top-2 right-2 w-5 h-5 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-colors z-10',
-                        isSelected 
-                          ? 'bg-violet-500 border-violet-500 text-white' 
+                        isSelected
+                          ? 'bg-violet-500 border-violet-500 text-white'
                           : 'border-white/30 hover:border-white/50'
                       )}
                     >
@@ -1274,23 +1274,23 @@ export function AppContent() {
                     </div>
 
                     {/* Preview */}
-                    <div 
+                    <div
                       onClick={() => setEditingFormat({ key: formatKey, format })}
                       className="relative bg-white/5 rounded-xl mb-2 overflow-hidden cursor-pointer hover:ring-2 hover:ring-violet-500/50 transition-all"
-                      style={{ 
+                      style={{
                         paddingBottom: `${(format.height / format.width) * 100}%`,
                         maxHeight: '120px'
                       }}
                     >
                       {creative ? (
-                        <img 
-                          src={creative.imageUrl} 
+                        <img
+                          src={creative.imageUrl}
                           alt={format.name}
                           className="absolute inset-0 w-full h-full object-cover"
                         />
                       ) : sourceImage ? (
-                        <img 
-                          src={sourceImage} 
+                        <img
+                          src={sourceImage}
                           alt="Preview"
                           className="absolute inset-0 w-full h-full object-cover opacity-50"
                         />
@@ -1302,7 +1302,7 @@ export function AppContent() {
 
                       {/* Safe Zone Overlay for branding */}
                       {hasSafeZone && format.safeZone && (
-                        <SafeZoneOverlay 
+                        <SafeZoneOverlay
                           safeZone={format.safeZone}
                           width={format.width}
                           height={format.height}
@@ -1379,132 +1379,125 @@ export function AppContent() {
   // ============================================================================
 
   return (
-    <div className="flex h-screen mesh-gradient-bg">
-      <UnifiedSidebar
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        selectedPlatform={platform}
-        selectedCategory={category}
-        onPlatformChange={setPlatform}
-        onCategoryChange={setCategory}
-      />
-
-      <main className="flex-1 flex flex-col overflow-hidden relative">
+    <DesktopLayout currentView={currentView} onViewChange={setCurrentView}>
+      <div className="w-full h-full flex flex-col relative overflow-hidden">
         {/* Dashboard */}
         {currentView === 'dashboard' && (
-          <DashboardView 
+          <DashboardView
             onViewChange={setCurrentView}
             onOpenBrandKit={() => setCurrentView('ai-branding')}
             onExportAll={handleExport}
           />
         )}
-        
+
         {/* Generator */}
         {currentView === 'formats' && renderEditor()}
-        
+
         {/* AI Tools */}
         {currentView === 'ai-scoring' && (
-          <div className="flex-1 overflow-y-auto p-6 mesh-gradient-static">
+          <div className="flex-1 overflow-y-auto p-6 scrollbar-none">
             <CreativeScoring />
           </div>
         )}
         {currentView === 'ai-copywriter' && (
-          <div className="flex-1 overflow-y-auto p-6 mesh-gradient-static">
+          <div className="flex-1 overflow-y-auto p-6 scrollbar-none">
             <AICopywriter />
           </div>
         )}
         {currentView === 'ai-resize' && (
-          <div className="flex-1 overflow-y-auto p-6 mesh-gradient-static">
+          <div className="flex-1 overflow-y-auto p-6 scrollbar-none">
             <MagicResize />
           </div>
         )}
         {currentView === 'ai-templates' && (
-          <div className="flex-1 overflow-y-auto p-6 mesh-gradient-static">
+          <div className="flex-1 overflow-y-auto p-6 scrollbar-none">
             <TemplateLibrary />
           </div>
         )}
         {currentView === 'ai-branding' && (
-          <div className="flex-1 overflow-y-auto p-6 mesh-gradient-static">
+          <div className="flex-1 overflow-y-auto p-6 scrollbar-none">
             <AIBrandingKit />
           </div>
         )}
-        
+
         {/* Video */}
         {currentView === 'video-slideshow' && (
-          <div className="flex-1 overflow-y-auto mesh-gradient-static">
+          <div className="flex-1 overflow-y-auto scrollbar-none">
             <SlideshowBuilder />
           </div>
         )}
-        
+
         {/* Assets */}
         {currentView === 'gallery' && renderLibrary()}
-        
+
         {/* Preview & Export */}
         {currentView === 'mobile-preview' && (
-          <div className="flex-1 overflow-y-auto p-6 mesh-gradient-static">
+          <div className="flex-1 overflow-y-auto p-6 scrollbar-none">
             <MobilePreview />
           </div>
         )}
         {currentView === 'bulk-edit' && (
-          <div className="flex-1 overflow-y-auto p-6 mesh-gradient-static">
+          <div className="flex-1 overflow-y-auto p-6 scrollbar-none">
             <BulkEditMode />
           </div>
         )}
         {currentView === 'export' && renderLibrary()}
-        
+
         {/* Settings */}
         {currentView === 'settings' && (
-          <div className="flex-1 overflow-y-auto p-6 mesh-gradient-static">
+          <div className="flex-1 overflow-y-auto p-6 scrollbar-none">
             <SettingsModal open={true} onOpenChange={() => setCurrentView('dashboard')} />
           </div>
         )}
-        
+
         {/* Admin */}
         {currentView === 'admin' && (
           <AdminDashboard />
         )}
-      </main>
+      </div>
 
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
 
       {/* Format Editor Modal */}
-      {editingFormat && (
-        <FormatEditorV2
-          formatKey={editingFormat.key}
-          format={editingFormat.format}
-          sourceImage={sourceImage}
-          onClose={() => setEditingFormat(null)}
-          onSave={(textLayer, renderedImage) => {
-            const creative = {
-              id: `${editingFormat.key}-${Date.now()}`,
-              formatKey: editingFormat.key,
-              platform: platform as any,
-              category: category,
-              format: editingFormat.format,
-              baseImageUrl: sourceImage || '',
-              imageUrl: renderedImage,
-              textLayer,
-              createdAt: new Date(),
-            }
-            addCreatives([creative])
-          }}
-        />
-      )}
+      {
+        editingFormat && (
+          <FormatEditorV2
+            formatKey={editingFormat.key}
+            format={editingFormat.format}
+            sourceImage={sourceImage}
+            onClose={() => setEditingFormat(null)}
+            onSave={(textLayer, renderedImage) => {
+              const creative = {
+                id: `${editingFormat.key}-${Date.now()}`,
+                formatKey: editingFormat.key,
+                platform: platform as any,
+                category: category,
+                format: editingFormat.format,
+                baseImageUrl: sourceImage || '',
+                imageUrl: renderedImage,
+                textLayer,
+                createdAt: new Date(),
+              }
+              addCreatives([creative])
+            }}
+          />
+        )
+      }
 
       {/* Tools Panel (Ctrl+K) */}
-      <ToolsPanel 
-        isOpen={toolsPanelOpen} 
-        onClose={() => setToolsPanelOpen(false)} 
+      <ToolsPanel
+        isOpen={toolsPanelOpen}
+        onClose={() => setToolsPanelOpen(false)}
       />
 
       {/* Floating User Menu */}
-      <div className="fixed top-4 right-4 z-30">
-        <UserMenu 
+      <div className="absolute top-4 right-4 z-30">
+        <UserMenu
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenSubscription={() => setCurrentView('settings')}
         />
       </div>
-    </div>
+    </DesktopLayout >
   )
 }
 
@@ -1610,7 +1603,7 @@ function drawTextOverlay(
     const words = text.split(' ')
     const lines: string[] = []
     let line = ''
-    
+
     for (const word of words) {
       const testLine = line ? `${line} ${word}` : word
       if (ctx.measureText(testLine).width > maxWidth && line) {
@@ -1707,7 +1700,7 @@ function drawTextOverlay(
     ctx.font = `bold ${Math.round(ctaSize)}px ${fontFamily}`
     let ctaText = overlay.cta
     let ctaTextWidth = ctx.measureText(ctaText).width
-    
+
     // Zkrať text pokud je moc dlouhý
     const maxCtaTextWidth = maxTextWidth - ctaSize * 1.2
     if (ctaTextWidth > maxCtaTextWidth) {

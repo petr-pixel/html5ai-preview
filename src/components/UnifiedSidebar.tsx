@@ -45,7 +45,7 @@ import {
 // TYPES
 // ============================================================================
 
-export type ViewType = 
+export type ViewType =
   | 'dashboard'
   | 'formats'
   | 'ai-scoring'
@@ -101,7 +101,7 @@ function SidebarSection({ title, icon, children, defaultOpen = false, badge, gra
         )}
         <ChevronDown className={`w-4 h-4 text-white/30 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-      
+
       {isOpen && (
         <div className="px-2 pb-2 pt-1">
           {children}
@@ -130,11 +130,10 @@ function SidebarItem({ icon, label, active, onClick, badge, pro, description }: 
     <button
       onClick={onClick}
       title={description}
-      className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-        active 
-          ? 'bg-gradient-to-r from-violet-500/20 to-cyan-500/10 text-white border-l-2 border-violet-500 ml-[-1px]' 
+      className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${active
+          ? 'bg-gradient-to-r from-violet-500/20 to-cyan-500/10 text-white border-l-2 border-violet-500 ml-[-1px]'
           : 'text-white/50 hover:bg-white/5 hover:text-white/80'
-      }`}
+        }`}
     >
       <span className={active ? 'text-violet-400' : 'text-white/40'}>{icon}</span>
       <div className="flex-1 text-left">
@@ -171,7 +170,7 @@ export function UnifiedSidebar({
   const { profile } = useAuth()
   const creativesCount = Object.keys(creatives).length
   const isAdmin = profile?.is_admin === true
-  
+
   // Debug log pro admin status
   console.log('🔐 Sidebar - Profile:', profile, 'isAdmin:', isAdmin)
 
@@ -186,7 +185,7 @@ export function UnifiedSidebar({
       {/* Gradient orbs */}
       <div className="absolute top-0 left-0 w-32 h-32 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-20 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-      
+
       {/* Logo */}
       <div className="relative flex items-center gap-3 px-4 py-5">
         <div className="relative">
@@ -227,36 +226,34 @@ export function UnifiedSidebar({
           <div className="mb-2 px-3">
             <div className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Platformy</div>
           </div>
-          
+
           {Object.entries(platforms).map(([platformId, platform]) => (
             <div key={platformId} className="mb-1">
               <button
                 onClick={() => onPlatformChange(platformId as PlatformId)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ${
-                  selectedPlatform === platformId 
-                    ? 'bg-white/10 text-white' 
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 ${selectedPlatform === platformId
+                    ? 'bg-white/10 text-white'
                     : 'text-white/50 hover:bg-white/5 hover:text-white/70'
-                }`}
+                  }`}
               >
-                <div 
+                <div
                   className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shadow-lg"
-                  style={{ 
-                    background: platformId === 'sklik' 
-                      ? 'linear-gradient(135deg, #cc0000 0%, #ff3333 100%)' 
+                  style={{
+                    background: platformId === 'sklik'
+                      ? 'linear-gradient(135deg, #cc0000 0%, #ff3333 100%)'
                       : 'linear-gradient(135deg, #4285f4 0%, #34a853 100%)',
-                    boxShadow: platformId === 'sklik' 
-                      ? '0 4px 12px rgba(204, 0, 0, 0.3)' 
+                    boxShadow: platformId === 'sklik'
+                      ? '0 4px 12px rgba(204, 0, 0, 0.3)'
                       : '0 4px 12px rgba(66, 133, 244, 0.3)',
                   }}
                 >
                   {platformId === 'sklik' ? 'S' : 'G'}
                 </div>
                 <span className="flex-1 text-left text-sm font-medium">{platform.name}</span>
-                <ChevronRight className={`w-4 h-4 text-white/30 transition-transform ${
-                  selectedPlatform === platformId ? 'rotate-90' : ''
-                }`} />
+                <ChevronRight className={`w-4 h-4 text-white/30 transition-transform ${selectedPlatform === platformId ? 'rotate-90' : ''
+                  }`} />
               </button>
-              
+
               {selectedPlatform === platformId && (
                 <div className="ml-5 mt-1 space-y-0.5 border-l border-white/10 pl-3">
                   {Object.entries(platform.categories).map(([catId, category]) => (
@@ -266,11 +263,10 @@ export function UnifiedSidebar({
                         onCategoryChange(catId)
                         onViewChange('formats')
                       }}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all ${
-                        selectedCategory === catId
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all ${selectedCategory === catId
                           ? 'bg-violet-500/20 text-violet-300'
                           : 'text-white/40 hover:bg-white/5 hover:text-white/60'
-                      }`}
+                        }`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${selectedCategory === catId ? 'bg-violet-400' : 'bg-white/30'}`} />
                       <span className="flex-1 text-left">{category.name}</span>
@@ -367,13 +363,7 @@ export function UnifiedSidebar({
           icon={<Download className="w-5 h-5" />}
           gradient="text-amber-400"
         >
-          <SidebarItem
-            icon={<Smartphone className="w-5 h-5" />}
-            label="Mobile Preview"
-            description="Náhled jak bude reklama vypadat na mobilu"
-            active={currentView === 'mobile-preview'}
-            onClick={() => onViewChange('mobile-preview')}
-          />
+          {/* Removed Mobile Preview */}
           <SidebarItem
             icon={<Edit3 className="w-5 h-5" />}
             label="Bulk Edit"
@@ -435,34 +425,34 @@ interface DashboardViewProps {
 
 export function DashboardView({ onViewChange, onOpenBrandKit, onExportAll }: DashboardViewProps) {
   const { creatives, selectedFormats } = useAppStore()
-  
+
   const creativesArray = Object.values(creatives) as any[]
-  
+
   const stats = [
-    { 
-      label: 'Kreativy', 
-      value: creativesArray.length, 
-      icon: Images, 
+    {
+      label: 'Kreativy',
+      value: creativesArray.length,
+      icon: Images,
       gradient: 'from-violet-500 to-purple-600',
       iconBg: 'stat-card-icon',
       glow: 'shadow-violet-500/20'
     },
-    { 
-      label: 'Formáty', 
-      value: selectedFormats.size, 
-      icon: LayoutGrid, 
+    {
+      label: 'Formáty',
+      value: selectedFormats.size,
+      icon: LayoutGrid,
       gradient: 'from-cyan-500 to-blue-600',
       iconBg: 'stat-card-icon-cyan',
       glow: 'shadow-cyan-500/20'
     },
-    { 
-      label: 'Tento měsíc', 
+    {
+      label: 'Tento měsíc',
       value: creativesArray.filter(c => {
         const d = new Date(c.createdAt)
         const now = new Date()
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      }).length, 
-      icon: Sparkles, 
+      }).length,
+      icon: Sparkles,
       gradient: 'from-emerald-500 to-teal-600',
       iconBg: 'stat-card-icon-green',
       glow: 'shadow-emerald-500/20'
@@ -476,11 +466,11 @@ export function DashboardView({ onViewChange, onOpenBrandKit, onExportAll }: Das
         <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
         <p className="text-white/50">Vítejte zpět! Zde je přehled vašich kreativ.</p>
       </div>
-      
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {stats.map((stat, index) => (
-          <div 
+          <div
             key={stat.label}
             className={`glass-card-hover p-6 ${stat.glow}`}
           >
@@ -530,7 +520,7 @@ export function DashboardView({ onViewChange, onOpenBrandKit, onExportAll }: Das
             Rychlé akce
           </h2>
           <div className="space-y-3">
-            <button 
+            <button
               onClick={() => onViewChange?.('formats')}
               className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-violet-500/30 transition-all duration-200 text-left group"
             >
@@ -543,8 +533,8 @@ export function DashboardView({ onViewChange, onOpenBrandKit, onExportAll }: Das
               </div>
               <ArrowRight className="w-5 h-5 text-white/30 group-hover:text-violet-400 group-hover:translate-x-1 transition-all" />
             </button>
-            
-            <button 
+
+            <button
               onClick={() => onOpenBrandKit?.()}
               className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-cyan-500/30 transition-all duration-200 text-left group"
             >
@@ -557,8 +547,8 @@ export function DashboardView({ onViewChange, onOpenBrandKit, onExportAll }: Das
               </div>
               <ArrowRight className="w-5 h-5 text-white/30 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
             </button>
-            
-            <button 
+
+            <button
               onClick={() => onExportAll?.()}
               className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-emerald-500/30 transition-all duration-200 text-left group"
             >
