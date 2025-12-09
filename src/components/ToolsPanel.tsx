@@ -24,7 +24,7 @@ import { TemplateLibrary } from './TemplateLibrary'
 import { AIBrandingKit } from './AIBrandingKit'
 import { BulkEditMode } from './BulkEditMode'
 import { MobilePreview } from './MobilePreview'
-import type { Creative } from '@/types'
+
 
 // =============================================================================
 // ICONS
@@ -88,12 +88,12 @@ const XIcon = ({ className }: { className?: string }) => (
 // TYPES
 // =============================================================================
 
-type ToolId = 
-  | 'scoring' 
-  | 'copywriter' 
-  | 'magic-resize' 
-  | 'templates' 
-  | 'scanner' 
+type ToolId =
+  | 'scoring'
+  | 'copywriter'
+  | 'magic-resize'
+  | 'templates'
+  | 'scanner'
   | 'bulk-edit'
   | 'mobile-preview'
 
@@ -190,27 +190,27 @@ const TOOLS: Tool[] = [
 export function ToolsPanel({ isOpen, onClose, previewCreative }: ToolsPanelProps) {
   const { sourceImage, creatives: storeCreatives } = useAppStore()
   const [activeTool, setActiveTool] = useState<ToolId | null>(null)
-  
+
   // Konverze objektu na pole
   const creatives = useMemo(() => Object.values(storeCreatives) as Creative[], [storeCreatives])
-  
+
   if (!isOpen) return null
-  
+
   const canUseTool = (tool: Tool): boolean => {
     if (tool.requiresImage && !sourceImage) return false
     if (tool.requiresCreatives && creatives.length === 0) return false
     return true
   }
-  
+
   const handleToolClick = (tool: Tool) => {
     if (!canUseTool(tool)) return
     setActiveTool(tool.id)
   }
-  
+
   const closeTool = () => {
     setActiveTool(null)
   }
-  
+
   // Render active tool modal
   const renderActiveTool = () => {
     switch (activeTool) {
@@ -246,15 +246,15 @@ export function ToolsPanel({ isOpen, onClose, previewCreative }: ToolsPanelProps
         )
       case 'bulk-edit':
         return (
-          <BulkEditMode 
-            creatives={creatives} 
-            onClose={closeTool} 
+          <BulkEditMode
+            creatives={creatives}
+            onClose={closeTool}
           />
         )
       case 'mobile-preview':
         return previewCreative || creatives.length > 0 ? (
-          <MobilePreview 
-            creative={previewCreative || creatives[0]} 
+          <MobilePreview
+            creative={previewCreative || creatives[0]}
             onClose={closeTool}
           />
         ) : null
@@ -267,59 +267,59 @@ export function ToolsPanel({ isOpen, onClose, previewCreative }: ToolsPanelProps
     <>
       {/* Main Panel */}
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40 p-4" onClick={onClose}>
-        <div 
-          className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden"
+        <div
+          className="bg-[#0F1115]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-slate-50">
+          <div className="px-6 py-4 border-b border-white/10 bg-white/5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+                <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg shadow-lg shadow-blue-500/20">
                   <SparklesIcon className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">AI Nástroje</h3>
-                  <p className="text-sm text-gray-500">Automatizace a optimalizace</p>
+                  <h3 className="font-semibold text-white">AI Nástroje</h3>
+                  <p className="text-sm text-white/50">Automatizace a optimalizace</p>
                 </div>
               </div>
-              <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg">
-                <XIcon className="w-5 h-5 text-gray-500" />
+              <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                <XIcon className="w-5 h-5 text-white/50 hover:text-white" />
               </button>
             </div>
           </div>
-          
+
           {/* Tools Grid */}
           <div className="p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {TOOLS.map((tool) => {
                 const isEnabled = canUseTool(tool)
-                
+
                 return (
                   <button
                     key={tool.id}
                     onClick={() => handleToolClick(tool)}
                     disabled={!isEnabled}
                     className={cn(
-                      "flex items-start gap-4 p-4 rounded-xl border text-left transition-all",
-                      isEnabled 
-                        ? "hover:shadow-md hover:border-gray-300 cursor-pointer" 
-                        : "opacity-50 cursor-not-allowed bg-gray-50"
+                      "flex items-start gap-4 p-4 rounded-xl border border-white/5 text-left transition-all",
+                      isEnabled
+                        ? "bg-white/5 hover:bg-white/10 hover:border-violet-500/30 cursor-pointer"
+                        : "opacity-40 cursor-not-allowed bg-black/20"
                     )}
                   >
-                    <div className={cn("p-3 rounded-xl", tool.bgColor)}>
+                    <div className={cn("p-3 rounded-xl bg-white/5", tool.color)}>
                       <tool.icon className={cn("w-6 h-6", tool.color)} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-medium text-gray-900">{tool.name}</h4>
+                        <h4 className="font-medium text-white">{tool.name}</h4>
                         {tool.isNew && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-700 rounded">
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded">
                             NOVÉ
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500 mt-0.5">{tool.description}</p>
+                      <p className="text-sm text-white/50 mt-0.5">{tool.description}</p>
                       {!isEnabled && (
                         <p className="text-xs text-orange-600 mt-1">
                           {tool.requiresImage && '⚠️ Vyžaduje obrázek'}
@@ -332,16 +332,16 @@ export function ToolsPanel({ isOpen, onClose, previewCreative }: ToolsPanelProps
               })}
             </div>
           </div>
-          
+
           {/* Footer tip */}
-          <div className="px-6 py-3 border-t bg-gray-50 text-center">
-            <p className="text-xs text-gray-500">
-              💡 Tip: Použijte <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-[10px]">Ctrl+K</kbd> pro rychlý přístup k nástrojům
+          <div className="px-6 py-3 border-t border-white/10 bg-white/5 text-center">
+            <p className="text-xs text-white/40">
+              💡 Tip: Použijte <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/10 rounded text-[10px] font-mono text-white/70">Ctrl+K</kbd> pro rychlý přístup k nástrojům
             </p>
           </div>
         </div>
       </div>
-      
+
       {/* Active Tool Modal */}
       {renderActiveTool()}
     </>

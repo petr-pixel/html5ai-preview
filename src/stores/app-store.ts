@@ -21,12 +21,12 @@ const customStorage: StateStorage = {
     try {
       const sizeKB = value.length / 1024
       const sizeMB = sizeKB / 1024
-      
+
       // Varování pokud je příliš velké
       if (sizeMB > 4) {
         console.warn(`⚠️ localStorage: Data too large (${sizeMB.toFixed(2)} MB). May fail!`)
       }
-      
+
       localStorage.setItem(name, value)
       console.log(`💾 localStorage: Saved "${name}" (${sizeKB.toFixed(1)} KB)`)
     } catch (error) {
@@ -55,6 +55,13 @@ const defaultTextOverlay: TextOverlay = {
   position: 'bottom-left',
   ctaColor: '#f97316',
   fontSize: 'medium',
+  shadow: {
+    enabled: false,
+    color: 'rgba(0,0,0,0.8)',
+    blur: 4,
+    offsetX: 2,
+    offsetY: 2,
+  },
 }
 
 const defaultWatermark: Watermark = {
@@ -331,65 +338,65 @@ export const useAppStore = create<AppState>()(
         // Omezit počet creatives pro localStorage (max 20)
         const creativesEntries = Object.entries(state.creatives)
         const limitedCreatives: Record<string, any> = {}
-        
+
         // Vzít jen posledních 20 kreativ podle ID (které obsahuje timestamp)
         const sortedEntries = creativesEntries.sort((a, b) => {
           const timeA = parseInt(a[0].split('-').pop() || '0')
           const timeB = parseInt(b[0].split('-').pop() || '0')
           return timeB - timeA
         }).slice(0, 20)
-        
+
         sortedEntries.forEach(([id, creative]) => {
           limitedCreatives[id] = creative
         })
-        
+
         if (creativesEntries.length > 20) {
           console.warn(`⚠️ Omezeno na 20 kreativ pro localStorage (bylo ${creativesEntries.length})`)
         }
-        
+
         return {
           // API & Config
           apiKeys: state.apiKeys,
           supabaseConfig: (state as any).supabaseConfig,
-          
+
           // Creatives - max 20
           creatives: limitedCreatives,
-          
+
           // Per-format settings
           perFormatTextLayers: state.perFormatTextLayers,
           perFormatTextSettings: state.perFormatTextSettings,
           formatOffsets: state.formatOffsets,
           formatOutputSettings: state.formatOutputSettings,
           outpaintedImages: state.outpaintedImages,
-          
+
           // Source
           sourceImage: state.sourceImage,
           sourceVariants: state.sourceVariants,
           activeSourceVariant: state.activeSourceVariant,
-          
+
           // Text & Overlays
           textOverlay: state.textOverlay,
           watermark: state.watermark,
           qrCode: state.qrCode,
-          
+
           // Branding
           brandKits: state.brandKits,
           activeBrandKit: state.activeBrandKit,
-          
+
           // AI Model settings
           textModelTier: state.textModelTier,
           imageModelTier: state.imageModelTier,
           videoModelTier: state.videoModelTier,
-          
+
           // Video
           videoScenario: state.videoScenario,
-          
+
           // A/B Testing
           abVariants: state.abVariants,
-          
+
           // History - max 5
           history: state.history.slice(-5),
-          
+
           // Platform & Category selection
           platform: state.platform,
           category: state.category,

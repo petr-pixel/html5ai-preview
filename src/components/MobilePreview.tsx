@@ -104,25 +104,25 @@ const PLACEMENTS = [
 
 export function MobilePreview({ creative: propCreative, onClose }: MobilePreviewProps) {
   const { creatives: storeCreatives } = useAppStore()
-  
+
   // Konverze objektu na pole
   const creatives = useMemo(() => Object.values(storeCreatives) as Creative[], [storeCreatives])
-  
+
   // Použít předanou creative nebo první ze store
   const creative = propCreative ?? creatives[0]
-  
+
   const [selectedDevice, setSelectedDevice] = useState<Device>(DEVICES[0])
   const [placement, setPlacement] = useState('feed')
   const [darkMode, setDarkMode] = useState(false)
   const [selectedCreativeIndex, setSelectedCreativeIndex] = useState(0)
   const previewRef = useRef<HTMLDivElement>(null)
-  
+
   // Pokud není předaná creative, použít vybranou z galerie
   const displayedCreative = propCreative ?? creatives[selectedCreativeIndex]
-  
+
   const takeScreenshot = async () => {
     if (!previewRef.current) return
-    
+
     try {
       // Dynamically import html2canvas
       const html2canvas = (await import('html2canvas')).default
@@ -136,61 +136,60 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
       alert('Screenshot se nepodařil. Zkuste to znovu.')
     }
   }
-  
+
   // Empty state když není žádná creative
   if (!displayedCreative) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="text-center">
-          <SmartphoneIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Žádné kreativy</h3>
-          <p className="text-gray-500">Nejprve vygenerujte nějaké kreativy v editoru</p>
+          <SmartphoneIcon className="w-16 h-16 text-white/20 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-white mb-2">Žádné kreativy</h3>
+          <p className="text-white/40">Nejprve vygenerujte nějaké kreativy v editoru</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={onClose ? "fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" : "flex-1 p-4"}>
-      <div className={`bg-white rounded-xl shadow-2xl ${onClose ? 'max-w-5xl w-full max-h-[95vh]' : 'w-full h-full'} overflow-hidden flex flex-col`}>
+    <div className={onClose ? "fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm" : "flex-1 p-4"}>
+      <div className={`bg-[#0F1115]/95 backdrop-blur-xl border border-white/10 shadow-2xl ${onClose ? 'rounded-xl max-w-5xl w-full max-h-[95vh]' : 'w-full h-full rounded-none bg-transparent shadow-none border-none'} overflow-hidden flex flex-col`}>
         {/* Header */}
-        <div className="px-6 py-4 border-b flex items-center justify-between flex-shrink-0">
+        <div className="px-6 py-4 border-b border-white/10 bg-white/5 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
-            <SmartphoneIcon className="w-5 h-5 text-gray-600" />
+            <SmartphoneIcon className="w-5 h-5 text-white/60" />
             <div>
-              <h3 className="font-semibold text-gray-900">Náhled na zařízení</h3>
-              <p className="text-sm text-gray-500">{displayedCreative.format?.name || 'Creative'} • {displayedCreative.format?.width || '?'}×{displayedCreative.format?.height || '?'}</p>
+              <h3 className="font-semibold text-white">Náhled na zařízení</h3>
+              <p className="text-sm text-white/50">{displayedCreative.format?.name || 'Creative'} • {displayedCreative.format?.width || '?'}×{displayedCreative.format?.height || '?'}</p>
             </div>
           </div>
           {onClose && (
-            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-lg">
-              <XIcon className="w-5 h-5 text-gray-500" />
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors">
+              <XIcon className="w-5 h-5" />
             </button>
           )}
         </div>
-        
+
         {/* Creative selector when standalone */}
         {!propCreative && creatives.length > 1 && (
-          <div className="px-6 py-2 border-b bg-gray-50 flex items-center gap-2 overflow-x-auto">
-            <span className="text-sm text-gray-500 flex-shrink-0">Vybrat:</span>
+          <div className="px-6 py-2 border-b border-white/10 bg-white/5 flex items-center gap-2 overflow-x-auto">
+            <span className="text-sm text-white/50 flex-shrink-0">Vybrat:</span>
             {creatives.slice(0, 10).map((c, i) => (
               <button
                 key={c.id}
                 onClick={() => setSelectedCreativeIndex(i)}
-                className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 ${
-                  i === selectedCreativeIndex ? 'border-blue-500' : 'border-transparent'
-                }`}
+                className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all ${i === selectedCreativeIndex ? 'border-primary ring-2 ring-primary/20' : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
               >
                 <img src={c.imageUrl} alt="" className="w-full h-full object-cover" />
               </button>
             ))}
           </div>
         )}
-        
+
         {/* Toolbar */}
-        <div className="px-6 py-3 border-b flex items-center gap-4 flex-wrap flex-shrink-0">
+        <div className="px-6 py-3 border-b border-white/10 flex items-center gap-4 flex-wrap flex-shrink-0">
           {/* Device selector */}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-white/10 rounded-lg p-1">
             {DEVICES.map((device) => (
               <button
                 key={device.id}
@@ -198,8 +197,8 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                 className={cn(
                   "px-3 py-1.5 rounded text-sm flex items-center gap-1.5 transition-colors",
                   selectedDevice.id === device.id
-                    ? "bg-white shadow text-gray-900"
-                    : "text-gray-600 hover:text-gray-900"
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-white/50 hover:text-white hover:bg-white/5"
                 )}
               >
                 <device.icon className="w-4 h-4" />
@@ -207,45 +206,46 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
               </button>
             ))}
           </div>
-          
+
           {/* Placement selector */}
           <select
             value={placement}
             onChange={(e) => setPlacement(e.target.value)}
-            className="px-3 py-1.5 border rounded-lg text-sm"
+            className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-primary/50"
           >
             {PLACEMENTS.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id} className="bg-[#0F1115] text-white">{p.name}</option>
             ))}
           </select>
-          
+
           {/* Dark mode toggle */}
           <button
             onClick={() => setDarkMode(!darkMode)}
             className={cn(
-              "p-2 rounded-lg transition-colors",
-              darkMode ? "bg-gray-800 text-yellow-400" : "bg-gray-100 text-gray-600"
+              "p-2 rounded-lg transition-colors border border-white/10",
+              darkMode ? "bg-white/10 text-yellow-300" : "bg-white/5 text-white/60 hover:text-white"
             )}
+            title={darkMode ? "Přepnout na světlý režim" : "Přepnout na tmavý režim"}
           >
             {darkMode ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
           </button>
-          
+
           <div className="flex-1" />
-          
+
           {/* Screenshot button */}
           <button
             onClick={takeScreenshot}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600/80 hover:bg-blue-600 text-white rounded-lg text-sm transition-colors shadow-lg shadow-blue-500/20"
           >
             <CameraIcon className="w-4 h-4" />
             Screenshot
           </button>
         </div>
-        
+
         {/* Preview Area */}
         <div className={cn(
           "flex-1 flex items-center justify-center overflow-auto p-8",
-          darkMode ? "bg-gray-900" : "bg-gray-100"
+          "bg-[#050505]" // Always dark background for the tool
         )}>
           <div
             ref={previewRef}
@@ -259,7 +259,7 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
             {selectedDevice.icon === SmartphoneIcon && (
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-6 bg-black rounded-b-2xl z-20" />
             )}
-            
+
             {/* Screen content */}
             <div className={cn(
               "absolute inset-2 rounded-[32px] overflow-hidden",
@@ -276,7 +276,7 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                   <span>🔋</span>
                 </div>
               </div>
-              
+
               {/* Content area based on placement */}
               <div className={cn(
                 "flex-1 overflow-y-auto",
@@ -302,15 +302,15 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                       </div>
                       <div className={cn("h-16 rounded", darkMode ? "bg-gray-700" : "bg-gray-200")} />
                     </div>
-                    
+
                     {/* Ad */}
                     <div className={cn(
                       "rounded-lg overflow-hidden border",
                       darkMode ? "border-gray-700" : "border-gray-200"
                     )}>
                       <div className="relative">
-                        <img 
-                          src={displayedCreative.imageUrl} 
+                        <img
+                          src={displayedCreative.imageUrl}
                           alt="Ad preview"
                           className="w-full"
                           style={{ maxHeight: 200, objectFit: 'contain' }}
@@ -331,7 +331,7 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                         </p>
                       </div>
                     </div>
-                    
+
                     {/* Another fake post */}
                     <div className={cn(
                       "rounded-lg p-3",
@@ -349,7 +349,7 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                     </div>
                   </div>
                 )}
-                
+
                 {placement === 'sidebar' && (
                   <div className="flex h-full">
                     {/* Main content */}
@@ -369,8 +369,8 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                       "w-1/3 p-2 border-l",
                       darkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"
                     )}>
-                      <img 
-                        src={displayedCreative.imageUrl} 
+                      <img
+                        src={displayedCreative.imageUrl}
                         alt="Ad preview"
                         className="w-full rounded"
                       />
@@ -383,11 +383,11 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                     </div>
                   </div>
                 )}
-                
+
                 {placement === 'interstitial' && (
                   <div className="h-full flex items-center justify-center p-4 relative">
-                    <img 
-                      src={displayedCreative.imageUrl} 
+                    <img
+                      src={displayedCreative.imageUrl}
                       alt="Ad preview"
                       className="max-w-full max-h-full rounded-lg shadow-lg"
                     />
@@ -405,7 +405,7 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                     </p>
                   </div>
                 )}
-                
+
                 {placement === 'native' && (
                   <div className="p-3 space-y-3">
                     {/* Article header */}
@@ -419,7 +419,7 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                         darkMode ? "bg-gray-800" : "bg-gray-100"
                       )} />
                     </div>
-                    
+
                     {/* Paragraphs */}
                     {[...Array(3)].map((_, i) => (
                       <div key={i} className="space-y-1">
@@ -431,15 +431,15 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                         ))}
                       </div>
                     ))}
-                    
+
                     {/* Native ad */}
                     <div className={cn(
                       "rounded-lg overflow-hidden",
                       darkMode ? "bg-gray-800" : "bg-gray-50"
                     )}>
                       <div className="flex gap-2 p-2">
-                        <img 
-                          src={displayedCreative.imageUrl} 
+                        <img
+                          src={displayedCreative.imageUrl}
                           alt="Ad preview"
                           className="w-20 h-20 object-cover rounded"
                         />
@@ -465,7 +465,7 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* More paragraphs */}
                     {[...Array(2)].map((_, i) => (
                       <div key={`after-${i}`} className="space-y-1">
@@ -480,7 +480,7 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                   </div>
                 )}
               </div>
-              
+
               {/* Bottom navigation (for phones) */}
               {selectedDevice.icon === SmartphoneIcon && (
                 <div className={cn(
@@ -493,16 +493,16 @@ export function MobilePreview({ creative: propCreative, onClose }: MobilePreview
                 </div>
               )}
             </div>
-            
+
             {/* Home indicator */}
             {selectedDevice.icon === SmartphoneIcon && (
               <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1/3 h-1 bg-white/30 rounded-full" />
             )}
           </div>
         </div>
-        
+
         {/* Info bar */}
-        <div className="px-6 py-3 border-t bg-gray-50 flex items-center justify-between text-sm text-gray-500 flex-shrink-0">
+        <div className="px-6 py-3 border-t border-white/10 bg-white/5 flex items-center justify-between text-sm text-white/50 flex-shrink-0">
           <span>
             {selectedDevice.name} • {selectedDevice.width}×{selectedDevice.height}px • {PLACEMENTS.find(p => p.id === placement)?.description}
           </span>

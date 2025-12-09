@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils'
 import {
   X, RotateCcw, Eye, EyeOff, Minus, Plus, Type, Wand2, Loader2,
   Sparkles, MousePointer2, AlignLeft, AlignCenter, AlignRight, Check,
-  Undo2, Redo2, Anchor, Move, Lock, Unlock, AlertTriangle
+  Undo2, Redo2, Anchor, Move, Lock, Unlock, AlertTriangle, Play, Film
 } from 'lucide-react'
 import type { Format, TextLayer, TextElement, CTAElement, LogoElement, BrandKit } from '@/types'
 
@@ -229,6 +229,8 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
   const [isSaving, setIsSaving] = useState(false)
   const [needsOutpaint, setNeedsOutpaint] = useState(false)
   const [emptyAreas, setEmptyAreas] = useState({ top: 0, bottom: 0, left: 0, right: 0 })
+  const [isAnimated, setIsAnimated] = useState(false)
+  const [animationPreset, setAnimationPreset] = useState('fade')
 
   // Outpainted image
   const outpaintedImage = outpaintedImages[formatKey] || null
@@ -601,507 +603,569 @@ export function FormatEditorV2({ formatKey, format, sourceImage, onClose, onSave
   // ==========================================================================
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-[#1a1d24] border border-white/10 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-          <div>
-            <h2 className="text-lg font-semibold text-white">{format.name}</h2>
-            <p className="text-sm text-gray-400">{format.width} × {format.height}px</p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-white/70 hover:text-white transition-colors">
+    <div className="w-full h-full flex flex-col bg-[#0F1115]/95 backdrop-blur-3xl text-white">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5 backdrop-blur-md">
+        <div>
+          <h2 className="text-lg font-semibold text-white">{format.name}</h2>
+          <p className="text-sm text-gray-400">{format.width} × {format.height}px</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="w-5 h-5" />
-          </button>
+          </Button>
+
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex">
+        {/* Canvas area */}
+        <div className="flex-1 p-6 bg-black/20 flex flex-col items-center justify-center" onClick={() => { setSelected(null); setEditing(null) }}>
+          {/* Canvas */}
+          <div
+            ref={containerRef}
+            className="relative bg-[#0F1115] shadow-2xl overflow-hidden border border-white/5"
+            style={{ width: displayW, height: displayH }}
+          >
+            {/* Empty area indicators */}
+            {needsOutpaint && !outpaintedImage && !locked && (
+              <>
+                {emptyAreas.top > 0 && (
+                  <div className="absolute top-0 left-0 right-0 bg-amber-500/30 border-b-2 border-amber-500 border-dashed flex items-center justify-center" style={{ height: emptyAreas.top * scale }}>
+                    <span className="text-amber-800 text-xs font-medium bg-amber-200 px-2 py-0.5 rounded">Prázdná oblast</span>
+                  </div>
+                )}
+                {emptyAreas.bottom > 0 && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-amber-500/30 border-t-2 border-amber-500 border-dashed flex items-center justify-center" style={{ height: emptyAreas.bottom * scale }}>
+                    <span className="text-amber-800 text-xs font-medium bg-amber-200 px-2 py-0.5 rounded">Prázdná oblast</span>
+                  </div>
+                )}
+                {emptyAreas.left > 0 && (
+                  <div className="absolute top-0 bottom-0 left-0 bg-amber-500/30 border-r-2 border-amber-500 border-dashed" style={{ width: emptyAreas.left * scale }} />
+                )}
+                {emptyAreas.right > 0 && (
+                  <div className="absolute top-0 bottom-0 right-0 bg-amber-500/30 border-l-2 border-amber-500 border-dashed" style={{ width: emptyAreas.right * scale }} />
+                )}
+              </>
+            )}
+
+            {/* Image */}
+            {(sourceImage || outpaintedImage) && (
+              <div
+                className={cn(
+                  "absolute inset-0",
+                  !locked && !outpaintedImage && "cursor-grab active:cursor-grabbing",
+                  locked && !outpaintedImage && "cursor-not-allowed",
+                  selected === 'image' && "ring-2 ring-blue-500 ring-inset"
+                )}
+                onMouseDown={handleImageMouseDown}
+                onClick={e => e.stopPropagation()}
+              >
+                <img
+                  src={outpaintedImage || sourceImage!}
+                  alt=""
+                  className={outpaintedImage ? "w-full h-full object-cover" : "absolute"}
+                  style={outpaintedImage ? undefined : imageStyle}
+                  draggable={false}
+                />
+
+                {/* Status badge */}
+                {!outpaintedImage && (
+                  <div className={cn(
+                    "absolute top-2 left-2 text-xs px-2 py-1 rounded flex items-center gap-1",
+                    locked ? "bg-green-500 text-white" : "bg-blue-500 text-white"
+                  )}>
+                    {locked ? <><Lock className="w-3 h-3" /> Ukotveno</> : <><Move className="w-3 h-3" /> Táhni obrázek</>}
+                  </div>
+                )}
+
+                {outpaintedImage && (
+                  <div className="absolute top-2 left-2 text-xs px-2 py-1 rounded flex items-center gap-1 bg-green-500 text-white">
+                    <Sparkles className="w-3 h-3" /> Pozadí hotovo
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Text elements */}
+            {textLayer.headline.visible && (
+              <Draggable
+                x={textLayer.headline.x}
+                y={textLayer.headline.y}
+                onMove={(x, y) => updateText('headline', { x, y })}
+                onMoveEnd={() => { }}
+                isSelected={selected === 'headline'}
+                onSelect={() => setSelected('headline')}
+                label="Headline"
+                color="blue"
+              >
+                {editing === 'headline' ? (
+                  <input
+                    autoFocus
+                    value={textLayer.headline.text}
+                    onChange={e => updateText('headline', { text: e.target.value })}
+                    onBlur={() => setEditing(null)}
+                    onKeyDown={e => e.key === 'Enter' && setEditing(null)}
+                    className="px-2 py-1 border border-blue-500/50 rounded bg-[#0F1115] text-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xl"
+                    style={{ fontSize: Math.max(12, textLayer.headline.fontSize * 0.6) }}
+                  />
+                ) : (
+                  <div
+                    onDoubleClick={() => setEditing('headline')}
+                    style={{
+                      fontSize: textLayer.headline.fontSize,
+                      fontWeight: textLayer.headline.fontWeight,
+                      color: textLayer.headline.color,
+                      textShadow: textLayer.headline.shadow ? '0 2px 4px rgba(0,0,0,0.8)' : 'none',
+                      textAlign: textLayer.headline.textAlign,
+                    }}
+                  >
+                    {textLayer.headline.text || '[Headline]'}
+                  </div>
+                )}
+              </Draggable>
+            )}
+
+            {textLayer.subheadline.visible && (
+              <Draggable
+                x={textLayer.subheadline.x}
+                y={textLayer.subheadline.y}
+                onMove={(x, y) => updateText('subheadline', { x, y })}
+                onMoveEnd={() => { }}
+                isSelected={selected === 'subheadline'}
+                onSelect={() => setSelected('subheadline')}
+                label="Subheadline"
+                color="green"
+              >
+                {editing === 'subheadline' ? (
+                  <input
+                    autoFocus
+                    value={textLayer.subheadline.text}
+                    onChange={e => updateText('subheadline', { text: e.target.value })}
+                    onBlur={() => setEditing(null)}
+                    onKeyDown={e => e.key === 'Enter' && setEditing(null)}
+                    className="px-2 py-1 border border-green-500/50 rounded bg-[#0F1115] text-white focus:outline-none focus:ring-2 focus:ring-green-500 shadow-xl"
+                  />
+                ) : (
+                  <div
+                    onDoubleClick={() => setEditing('subheadline')}
+                    style={{
+                      fontSize: textLayer.subheadline.fontSize,
+                      fontWeight: textLayer.subheadline.fontWeight,
+                      color: textLayer.subheadline.color,
+                      textShadow: textLayer.subheadline.shadow ? '0 2px 4px rgba(0,0,0,0.8)' : 'none',
+                    }}
+                  >
+                    {textLayer.subheadline.text || '[Subheadline]'}
+                  </div>
+                )}
+              </Draggable>
+            )}
+
+            {textLayer.cta.visible && (
+              <Draggable
+                x={textLayer.cta.x}
+                y={textLayer.cta.y}
+                onMove={(x, y) => updateText('cta', { x, y })}
+                onMoveEnd={() => { }}
+                isSelected={selected === 'cta'}
+                onSelect={() => setSelected('cta')}
+                label="CTA"
+                color="orange"
+              >
+                {editing === 'cta' ? (
+                  <input
+                    autoFocus
+                    value={textLayer.cta.text}
+                    onChange={e => updateText('cta', { text: e.target.value })}
+                    onBlur={() => setEditing(null)}
+                    onKeyDown={e => e.key === 'Enter' && setEditing(null)}
+                    className="px-2 py-1 border border-orange-500/50 rounded bg-[#0F1115] text-white focus:outline-none focus:ring-2 focus:ring-orange-500 shadow-xl"
+                  />
+                ) : (
+                  <div
+                    onDoubleClick={() => setEditing('cta')}
+                    style={{
+                      fontSize: textLayer.cta.fontSize,
+                      fontWeight: textLayer.cta.fontWeight,
+                      color: textLayer.cta.color,
+                      backgroundColor: (textLayer.cta as CTAElement).backgroundColor,
+                      padding: `${(textLayer.cta as CTAElement).paddingY}px ${(textLayer.cta as CTAElement).paddingX}px`,
+                      borderRadius: (textLayer.cta as CTAElement).borderRadius,
+                    }}
+                  >
+                    {textLayer.cta.text || '[CTA]'}
+                  </div>
+                )}
+              </Draggable>
+            )}
+
+            {textLayer.logo.visible && brandKit?.logoMain && (
+              <Draggable
+                x={textLayer.logo.x}
+                y={textLayer.logo.y}
+                onMove={(x, y) => updateLogo({ x, y })}
+                onMoveEnd={() => { }}
+                isSelected={selected === 'logo'}
+                onSelect={() => setSelected('logo')}
+                label="Logo"
+                color="purple"
+              >
+                <img
+                  src={brandKit.logoMain}
+                  alt="Logo"
+                  style={{ width: (textLayer.logo.width / 100) * displayW, opacity: textLayer.logo.opacity }}
+                  draggable={false}
+                />
+              </Draggable>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {/* Step 1-2: Position & Lock */}
+            {!outpaintedImage && needsOutpaint && (
+              <>
+                {!locked ? (
+                  <Button onClick={handleLock} size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+                    <Anchor className="w-4 h-4 mr-2" />
+                    Ukotvit pozici
+                  </Button>
+                ) : (
+                  <Button onClick={handleUnlock} variant="outline" size="sm">
+                    <Unlock className="w-4 h-4 mr-2" />
+                    Odemknout
+                  </Button>
+                )}
+              </>
+            )}
+
+            {/* Step 3: Outpaint */}
+            {needsOutpaint && locked && !outpaintedImage && (
+              <Button
+                onClick={handleOutpaint}
+                disabled={isOutpainting}
+                size="sm"
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+              >
+                {isOutpainting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
+                Dopočítat pozadí
+                {apiKeys.openai ? (
+                  <CostBadge cost={calculateCost('outpaint', { quality: 'medium' })} />
+                ) : (
+                  <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded">blur</span>
+                )}
+              </Button>
+            )}
+
+            {/* Info if no API key */}
+            {needsOutpaint && locked && !outpaintedImage && !apiKeys.openai && (
+              <span className="text-xs text-blue-600 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                Použije se blur fallback (bez OpenAI klíče)
+              </span>
+            )}
+
+            <span className="text-xs text-gray-500">
+              <MousePointer2 className="w-3 h-3 inline mr-1" />
+              Dvojklik = edit textu
+            </span>
+          </div>
         </div>
 
-        <div className="flex">
-          {/* Canvas area */}
-          <div className="flex-1 p-6 bg-black/20 flex flex-col items-center justify-center" onClick={() => { setSelected(null); setEditing(null) }}>
-            {/* Canvas */}
-            <div
-              ref={containerRef}
-              className="relative bg-[#0F1115] shadow-2xl overflow-hidden border border-white/5"
-              style={{ width: displayW, height: displayH }}
-            >
-              {/* Empty area indicators */}
-              {needsOutpaint && !outpaintedImage && !locked && (
-                <>
-                  {emptyAreas.top > 0 && (
-                    <div className="absolute top-0 left-0 right-0 bg-amber-500/30 border-b-2 border-amber-500 border-dashed flex items-center justify-center" style={{ height: emptyAreas.top * scale }}>
-                      <span className="text-amber-800 text-xs font-medium bg-amber-200 px-2 py-0.5 rounded">Prázdná oblast</span>
-                    </div>
-                  )}
-                  {emptyAreas.bottom > 0 && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-amber-500/30 border-t-2 border-amber-500 border-dashed flex items-center justify-center" style={{ height: emptyAreas.bottom * scale }}>
-                      <span className="text-amber-800 text-xs font-medium bg-amber-200 px-2 py-0.5 rounded">Prázdná oblast</span>
-                    </div>
-                  )}
-                  {emptyAreas.left > 0 && (
-                    <div className="absolute top-0 bottom-0 left-0 bg-amber-500/30 border-r-2 border-amber-500 border-dashed" style={{ width: emptyAreas.left * scale }} />
-                  )}
-                  {emptyAreas.right > 0 && (
-                    <div className="absolute top-0 bottom-0 right-0 bg-amber-500/30 border-l-2 border-amber-500 border-dashed" style={{ width: emptyAreas.right * scale }} />
-                  )}
-                </>
-              )}
+        {/* Sidebar */}
+        <div className="w-80 border-l border-white/10 p-5 overflow-y-auto max-h-[calc(95vh-80px)] bg-[#0F1115]/80 backdrop-blur-xl scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
 
-              {/* Image */}
-              {(sourceImage || outpaintedImage) && (
-                <div
+          {/* HTML5 Animation Controls */}
+          <div className="mb-5 bg-gradient-to-br from-indigo-900/20 to-blue-900/20 p-4 rounded-xl border border-indigo-500/20">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-indigo-300 flex items-center gap-2">
+                <Film className="w-4 h-4 text-indigo-400" />
+                Animace (HTML5)
+              </h3>
+              <button
+                onClick={() => setIsAnimated(!isAnimated)}
+                className={cn(
+                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2  focus-visible:ring-white focus-visible:ring-opacity-75",
+                  isAnimated ? "bg-indigo-600" : "bg-gray-200"
+                )}
+              >
+                <span className="sr-only">Use setting</span>
+                <span
+                  aria-hidden="true"
                   className={cn(
-                    "absolute inset-0",
-                    !locked && !outpaintedImage && "cursor-grab active:cursor-grabbing",
-                    locked && !outpaintedImage && "cursor-not-allowed",
-                    selected === 'image' && "ring-2 ring-blue-500 ring-inset"
+                    "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
+                    isAnimated ? "translate-x-4" : "translate-x-0"
                   )}
-                  onMouseDown={handleImageMouseDown}
-                  onClick={e => e.stopPropagation()}
-                >
-                  <img
-                    src={outpaintedImage || sourceImage!}
-                    alt=""
-                    className={outpaintedImage ? "w-full h-full object-cover" : "absolute"}
-                    style={outpaintedImage ? undefined : imageStyle}
-                    draggable={false}
-                  />
-
-                  {/* Status badge */}
-                  {!outpaintedImage && (
-                    <div className={cn(
-                      "absolute top-2 left-2 text-xs px-2 py-1 rounded flex items-center gap-1",
-                      locked ? "bg-green-500 text-white" : "bg-blue-500 text-white"
-                    )}>
-                      {locked ? <><Lock className="w-3 h-3" /> Ukotveno</> : <><Move className="w-3 h-3" /> Táhni obrázek</>}
-                    </div>
-                  )}
-
-                  {outpaintedImage && (
-                    <div className="absolute top-2 left-2 text-xs px-2 py-1 rounded flex items-center gap-1 bg-green-500 text-white">
-                      <Sparkles className="w-3 h-3" /> Pozadí hotovo
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Text elements */}
-              {textLayer.headline.visible && (
-                <Draggable
-                  x={textLayer.headline.x}
-                  y={textLayer.headline.y}
-                  onMove={(x, y) => updateText('headline', { x, y })}
-                  onMoveEnd={() => { }}
-                  isSelected={selected === 'headline'}
-                  onSelect={() => setSelected('headline')}
-                  label="Headline"
-                  color="blue"
-                >
-                  {editing === 'headline' ? (
-                    <input
-                      autoFocus
-                      value={textLayer.headline.text}
-                      onChange={e => updateText('headline', { text: e.target.value })}
-                      onBlur={() => setEditing(null)}
-                      onKeyDown={e => e.key === 'Enter' && setEditing(null)}
-                      className="px-2 py-1 border-2 border-blue-500 rounded bg-white text-black"
-                      style={{ fontSize: Math.max(12, textLayer.headline.fontSize * 0.6) }}
-                    />
-                  ) : (
-                    <div
-                      onDoubleClick={() => setEditing('headline')}
-                      style={{
-                        fontSize: textLayer.headline.fontSize,
-                        fontWeight: textLayer.headline.fontWeight,
-                        color: textLayer.headline.color,
-                        textShadow: textLayer.headline.shadow ? '0 2px 4px rgba(0,0,0,0.8)' : 'none',
-                        textAlign: textLayer.headline.textAlign,
-                      }}
-                    >
-                      {textLayer.headline.text || '[Headline]'}
-                    </div>
-                  )}
-                </Draggable>
-              )}
-
-              {textLayer.subheadline.visible && (
-                <Draggable
-                  x={textLayer.subheadline.x}
-                  y={textLayer.subheadline.y}
-                  onMove={(x, y) => updateText('subheadline', { x, y })}
-                  onMoveEnd={() => { }}
-                  isSelected={selected === 'subheadline'}
-                  onSelect={() => setSelected('subheadline')}
-                  label="Subheadline"
-                  color="green"
-                >
-                  {editing === 'subheadline' ? (
-                    <input
-                      autoFocus
-                      value={textLayer.subheadline.text}
-                      onChange={e => updateText('subheadline', { text: e.target.value })}
-                      onBlur={() => setEditing(null)}
-                      onKeyDown={e => e.key === 'Enter' && setEditing(null)}
-                      className="px-2 py-1 border-2 border-green-500 rounded bg-white text-black"
-                    />
-                  ) : (
-                    <div
-                      onDoubleClick={() => setEditing('subheadline')}
-                      style={{
-                        fontSize: textLayer.subheadline.fontSize,
-                        fontWeight: textLayer.subheadline.fontWeight,
-                        color: textLayer.subheadline.color,
-                        textShadow: textLayer.subheadline.shadow ? '0 2px 4px rgba(0,0,0,0.8)' : 'none',
-                      }}
-                    >
-                      {textLayer.subheadline.text || '[Subheadline]'}
-                    </div>
-                  )}
-                </Draggable>
-              )}
-
-              {textLayer.cta.visible && (
-                <Draggable
-                  x={textLayer.cta.x}
-                  y={textLayer.cta.y}
-                  onMove={(x, y) => updateText('cta', { x, y })}
-                  onMoveEnd={() => { }}
-                  isSelected={selected === 'cta'}
-                  onSelect={() => setSelected('cta')}
-                  label="CTA"
-                  color="orange"
-                >
-                  {editing === 'cta' ? (
-                    <input
-                      autoFocus
-                      value={textLayer.cta.text}
-                      onChange={e => updateText('cta', { text: e.target.value })}
-                      onBlur={() => setEditing(null)}
-                      onKeyDown={e => e.key === 'Enter' && setEditing(null)}
-                      className="px-2 py-1 border-2 border-orange-500 rounded bg-white text-black"
-                    />
-                  ) : (
-                    <div
-                      onDoubleClick={() => setEditing('cta')}
-                      style={{
-                        fontSize: textLayer.cta.fontSize,
-                        fontWeight: textLayer.cta.fontWeight,
-                        color: textLayer.cta.color,
-                        backgroundColor: (textLayer.cta as CTAElement).backgroundColor,
-                        padding: `${(textLayer.cta as CTAElement).paddingY}px ${(textLayer.cta as CTAElement).paddingX}px`,
-                        borderRadius: (textLayer.cta as CTAElement).borderRadius,
-                      }}
-                    >
-                      {textLayer.cta.text || '[CTA]'}
-                    </div>
-                  )}
-                </Draggable>
-              )}
-
-              {textLayer.logo.visible && brandKit?.logoMain && (
-                <Draggable
-                  x={textLayer.logo.x}
-                  y={textLayer.logo.y}
-                  onMove={(x, y) => updateLogo({ x, y })}
-                  onMoveEnd={() => { }}
-                  isSelected={selected === 'logo'}
-                  onSelect={() => setSelected('logo')}
-                  label="Logo"
-                  color="purple"
-                >
-                  <img
-                    src={brandKit.logoMain}
-                    alt="Logo"
-                    style={{ width: (textLayer.logo.width / 100) * displayW, opacity: textLayer.logo.opacity }}
-                    draggable={false}
-                  />
-                </Draggable>
-              )}
+                />
+              </button>
             </div>
 
-            {/* Action buttons */}
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              {/* Step 1-2: Position & Lock */}
-              {!outpaintedImage && needsOutpaint && (
-                <>
-                  {!locked ? (
-                    <Button onClick={handleLock} size="sm" className="bg-green-600 hover:bg-green-700 text-white">
-                      <Anchor className="w-4 h-4 mr-2" />
-                      Ukotvit pozici
-                    </Button>
-                  ) : (
-                    <Button onClick={handleUnlock} variant="outline" size="sm">
-                      <Unlock className="w-4 h-4 mr-2" />
-                      Odemknout
-                    </Button>
-                  )}
-                </>
-              )}
+            {isAnimated && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div>
+                  <label className="text-xs font-medium text-indigo-800 mb-1.5 block">Efekt</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['fade', 'slide', 'zoom', 'bounce'].map(effect => (
+                      <button
+                        key={effect}
+                        onClick={() => setAnimationPreset(effect)}
+                        className={cn(
+                          "text-xs px-2 py-1.5 rounded-md border text-center capitalize transition-colors",
+                          animationPreset === effect
+                            ? "bg-indigo-500 text-white border-indigo-600 shadow-sm"
+                            : "bg-white border-indigo-100 text-gray-600 hover:bg-indigo-50"
+                        )}
+                      >
+                        {effect}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-indigo-700 bg-white/50 p-2 rounded border border-indigo-100/50">
+                  <Play className="w-3 h-3" />
+                  <span>Náhled animace při exportu</span>
+                </div>
+              </div>
+            )}
+          </div>
 
-              {/* Step 3: Outpaint */}
-              {needsOutpaint && locked && !outpaintedImage && (
-                <Button
-                  onClick={handleOutpaint}
-                  disabled={isOutpainting}
-                  size="sm"
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+          {/* Layout Presets */}
+          <div className="mb-5">
+            <h3 className="text-sm font-semibold mb-2 text-gray-200">📐 Layout preset</h3>
+            <div className="grid grid-cols-3 gap-1">
+              {[
+                { id: 'bottom-left', icon: '↙️', label: 'Vlevo dole' },
+                { id: 'bottom-center', icon: '⬇️', label: 'Dole střed' },
+                { id: 'center', icon: '⏺️', label: 'Střed' },
+                { id: 'top-left', icon: '↖️', label: 'Vlevo nahoře' },
+                { id: 'left-stack', icon: '◀️', label: 'Vlevo' },
+                { id: 'right-stack', icon: '▶️', label: 'Vpravo' },
+              ].map(preset => (
+                <button
+                  key={preset.id}
+                  onClick={() => applyLayoutPreset(preset.id)}
+                  className="p-2 bg-white/5 border border-white/10 rounded hover:bg-white/10 text-center transition-colors"
+                  title={preset.label}
                 >
-                  {isOutpainting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
-                  Dopočítat pozadí
-                  {apiKeys.openai ? (
-                    <CostBadge cost={calculateCost('outpaint', { quality: 'medium' })} />
-                  ) : (
-                    <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded">blur</span>
-                  )}
-                </Button>
-              )}
-
-              {/* Info if no API key */}
-              {needsOutpaint && locked && !outpaintedImage && !apiKeys.openai && (
-                <span className="text-xs text-blue-600 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3" />
-                  Použije se blur fallback (bez OpenAI klíče)
-                </span>
-              )}
-
-              <span className="text-xs text-gray-500">
-                <MousePointer2 className="w-3 h-3 inline mr-1" />
-                Dvojklik = edit textu
-              </span>
+                  <span className="text-lg">{preset.icon}</span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="w-80 border-l p-5 overflow-y-auto max-h-[calc(95vh-80px)] bg-gray-50">
-            {/* Layout Presets */}
-            <div className="mb-5">
-              <h3 className="text-sm font-semibold mb-2 text-gray-700">📐 Layout preset</h3>
-              <div className="grid grid-cols-3 gap-1">
-                {[
-                  { id: 'bottom-left', icon: '↙️', label: 'Vlevo dole' },
-                  { id: 'bottom-center', icon: '⬇️', label: 'Dole střed' },
-                  { id: 'center', icon: '⏺️', label: 'Střed' },
-                  { id: 'top-left', icon: '↖️', label: 'Vlevo nahoře' },
-                  { id: 'left-stack', icon: '◀️', label: 'Vlevo' },
-                  { id: 'right-stack', icon: '▶️', label: 'Vpravo' },
-                ].map(preset => (
-                  <button
-                    key={preset.id}
-                    onClick={() => applyLayoutPreset(preset.id)}
-                    className="p-2 bg-white border rounded hover:bg-gray-100 text-center"
-                    title={preset.label}
-                  >
-                    <span className="text-lg">{preset.icon}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Layers */}
-            <div className="mb-5">
-              <h3 className="text-sm font-semibold mb-2 text-gray-700 flex items-center gap-2">
-                <Type className="w-4 h-4" /> Vrstvy
-              </h3>
-              <div className="space-y-1">
-                {(['headline', 'subheadline', 'cta'] as const).map(type => (
-                  <button
-                    key={type}
-                    onClick={() => {
-                      updateText(type, { visible: !textLayer[type].visible })
-                      if (textLayer[type].visible && selected === type) setSelected(null)
-                    }}
-                    className={cn(
-                      'w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-colors',
-                      textLayer[type].visible
-                        ? type === 'headline' ? 'bg-blue-50 border-blue-200 text-blue-700'
-                          : type === 'subheadline' ? 'bg-green-50 border-green-200 text-green-700'
-                            : 'bg-orange-50 border-orange-200 text-orange-700'
-                        : 'bg-white border-gray-200 text-gray-400'
-                    )}
-                  >
-                    <span className="font-medium capitalize">{type}</span>
-                    {textLayer[type].visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  </button>
-                ))}
+          {/* Layers */}
+          <div className="mb-5">
+            <h3 className="text-sm font-semibold mb-2 text-gray-200 flex items-center gap-2">
+              <Type className="w-4 h-4" /> Vrstvy
+            </h3>
+            <div className="space-y-1">
+              {(['headline', 'subheadline', 'cta'] as const).map(type => (
                 <button
+                  key={type}
                   onClick={() => {
-                    updateLogo({ visible: !textLayer.logo.visible })
-                    if (textLayer.logo.visible && selected === 'logo') setSelected(null)
+                    updateText(type, { visible: !textLayer[type].visible })
+                    if (textLayer[type].visible && selected === type) setSelected(null)
                   }}
-                  disabled={!brandKit?.logoMain}
                   className={cn(
                     'w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-colors',
-                    textLayer.logo.visible ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-white border-gray-200 text-gray-400',
-                    !brandKit?.logoMain && 'opacity-50 cursor-not-allowed'
+                    textLayer[type].visible
+                      ? type === 'headline' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                        : type === 'subheadline' ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                          : 'bg-orange-500/10 border-orange-500/30 text-orange-400'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   )}
                 >
-                  <span className="font-medium">Logo</span>
-                  {textLayer.logo.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  <span className="font-medium capitalize">{type}</span>
+                  {textLayer[type].visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
-              </div>
+              ))}
+              <button
+                onClick={() => {
+                  updateLogo({ visible: !textLayer.logo.visible })
+                  if (textLayer.logo.visible && selected === 'logo') setSelected(null)
+                }}
+                disabled={!brandKit?.logoMain}
+                className={cn(
+                  'w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-colors',
+                  textLayer.logo.visible ? 'bg-purple-500/10 border-purple-500/30 text-purple-400' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10',
+                  !brandKit?.logoMain && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                <span className="font-medium">Logo</span>
+                {textLayer.logo.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
             </div>
+          </div>
 
-            {/* Selected element properties */}
-            {selected && selected !== 'image' && selected !== 'logo' && textLayer[selected].visible && (
-              <div className="mb-5 p-4 bg-white rounded-xl border shadow-sm">
-                <h4 className="text-sm font-semibold mb-3 capitalize flex items-center gap-2">
-                  ✏️ {selected}
-                </h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Text</label>
+          {/* Selected element properties */}
+          {selected && selected !== 'image' && selected !== 'logo' && textLayer[selected].visible && (
+            <div className="mb-5 p-4 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
+              <h4 className="text-sm font-semibold mb-3 capitalize flex items-center gap-2">
+                ✏️ {selected}
+              </h4>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Text</label>
+                  <input
+                    type="text"
+                    value={textLayer[selected].text}
+                    onChange={e => updateText(selected, { text: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <label className="text-xs text-gray-500">Velikost</label>
+                    <span className="text-xs font-mono text-gray-600">{textLayer[selected].fontSize}px</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => updateText(selected, { fontSize: Math.max(10, textLayer[selected].fontSize - 2) })}>
+                      <Minus className="w-3 h-3" />
+                    </Button>
+                    <input
+                      type="range"
+                      min="10"
+                      max="100"
+                      value={textLayer[selected].fontSize}
+                      onChange={e => updateText(selected, { fontSize: parseInt(e.target.value) })}
+                      className="flex-1"
+                    />
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => updateText(selected, { fontSize: Math.min(100, textLayer[selected].fontSize + 2) })}>
+                      <Plus className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Zarovnání</label>
+                  <div className="flex gap-1">
+                    {(['left', 'center', 'right'] as const).map(a => (
+                      <button
+                        key={a}
+                        onClick={() => updateText(selected, { textAlign: a })}
+                        className={cn(
+                          'flex-1 p-2 rounded-lg border transition-colors',
+                          textLayer[selected].textAlign === a ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white hover:bg-gray-50'
+                        )}
+                      >
+                        {a === 'left' && <AlignLeft className="w-4 h-4 mx-auto" />}
+                        {a === 'center' && <AlignCenter className="w-4 h-4 mx-auto" />}
+                        {a === 'right' && <AlignRight className="w-4 h-4 mx-auto" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Barva textu</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={textLayer[selected].color}
+                      onChange={e => updateText(selected, { color: e.target.value })}
+                      className="w-10 h-10 rounded-lg border cursor-pointer"
+                    />
                     <input
                       type="text"
-                      value={textLayer[selected].text}
-                      onChange={e => updateText(selected, { text: e.target.value })}
-                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={textLayer[selected].color}
+                      onChange={e => updateText(selected, { color: e.target.value })}
+                      className="flex-1 px-2 py-1 border rounded-lg text-xs font-mono"
                     />
                   </div>
+                </div>
+                {selected === 'cta' && (
                   <div>
-                    <div className="flex justify-between mb-1">
-                      <label className="text-xs text-gray-500">Velikost</label>
-                      <span className="text-xs font-mono text-gray-600">{textLayer[selected].fontSize}px</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => updateText(selected, { fontSize: Math.max(10, textLayer[selected].fontSize - 2) })}>
-                        <Minus className="w-3 h-3" />
-                      </Button>
-                      <input
-                        type="range"
-                        min="10"
-                        max="100"
-                        value={textLayer[selected].fontSize}
-                        onChange={e => updateText(selected, { fontSize: parseInt(e.target.value) })}
-                        className="flex-1"
-                      />
-                      <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => updateText(selected, { fontSize: Math.min(100, textLayer[selected].fontSize + 2) })}>
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Zarovnání</label>
-                    <div className="flex gap-1">
-                      {(['left', 'center', 'right'] as const).map(a => (
-                        <button
-                          key={a}
-                          onClick={() => updateText(selected, { textAlign: a })}
-                          className={cn(
-                            'flex-1 p-2 rounded-lg border transition-colors',
-                            textLayer[selected].textAlign === a ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white hover:bg-gray-50'
-                          )}
-                        >
-                          {a === 'left' && <AlignLeft className="w-4 h-4 mx-auto" />}
-                          {a === 'center' && <AlignCenter className="w-4 h-4 mx-auto" />}
-                          {a === 'right' && <AlignRight className="w-4 h-4 mx-auto" />}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Barva textu</label>
+                    <label className="text-xs text-gray-500 block mb-1">Pozadí CTA</label>
                     <div className="flex gap-2">
                       <input
                         type="color"
-                        value={textLayer[selected].color}
-                        onChange={e => updateText(selected, { color: e.target.value })}
+                        value={(textLayer.cta as CTAElement).backgroundColor}
+                        onChange={e => updateText('cta', { backgroundColor: e.target.value })}
                         className="w-10 h-10 rounded-lg border cursor-pointer"
                       />
                       <input
                         type="text"
-                        value={textLayer[selected].color}
-                        onChange={e => updateText(selected, { color: e.target.value })}
+                        value={(textLayer.cta as CTAElement).backgroundColor}
+                        onChange={e => updateText('cta', { backgroundColor: e.target.value })}
                         className="flex-1 px-2 py-1 border rounded-lg text-xs font-mono"
                       />
                     </div>
                   </div>
-                  {selected === 'cta' && (
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">Pozadí CTA</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="color"
-                          value={(textLayer.cta as CTAElement).backgroundColor}
-                          onChange={e => updateText('cta', { backgroundColor: e.target.value })}
-                          className="w-10 h-10 rounded-lg border cursor-pointer"
-                        />
-                        <input
-                          type="text"
-                          value={(textLayer.cta as CTAElement).backgroundColor}
-                          onChange={e => updateText('cta', { backgroundColor: e.target.value })}
-                          className="flex-1 px-2 py-1 border rounded-lg text-xs font-mono"
-                        />
-                      </div>
-                    </div>
-                  )}
+                )}
+              </div>
+            </div>
+          )}
+
+          {selected === 'logo' && textLayer.logo.visible && (
+            <div className="mb-5 p-4 bg-purple-50 rounded-xl border border-purple-200">
+              <h4 className="text-sm font-semibold mb-3 text-purple-700">🏷️ Logo</h4>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <label className="text-xs text-purple-600">Velikost</label>
+                    <span className="text-xs font-mono">{textLayer.logo.width}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="40"
+                    value={textLayer.logo.width}
+                    onChange={e => updateLogo({ width: parseInt(e.target.value) })}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <label className="text-xs text-purple-600">Průhlednost</label>
+                    <span className="text-xs font-mono">{Math.round(textLayer.logo.opacity * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1"
+                    step="0.05"
+                    value={textLayer.logo.opacity}
+                    onChange={e => updateLogo({ opacity: parseFloat(e.target.value) })}
+                    className="w-full"
+                  />
                 </div>
               </div>
-            )}
-
-            {selected === 'logo' && textLayer.logo.visible && (
-              <div className="mb-5 p-4 bg-purple-50 rounded-xl border border-purple-200">
-                <h4 className="text-sm font-semibold mb-3 text-purple-700">🏷️ Logo</h4>
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <label className="text-xs text-purple-600">Velikost</label>
-                      <span className="text-xs font-mono">{textLayer.logo.width}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="5"
-                      max="40"
-                      value={textLayer.logo.width}
-                      onChange={e => updateLogo({ width: parseInt(e.target.value) })}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <label className="text-xs text-purple-600">Průhlednost</label>
-                      <span className="text-xs font-mono">{Math.round(textLayer.logo.opacity * 100)}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="1"
-                      step="0.05"
-                      value={textLayer.logo.opacity}
-                      onChange={e => updateLogo({ opacity: parseFloat(e.target.value) })}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Keyboard shortcuts */}
-            <div className="mb-5 p-3 bg-gray-100 rounded-lg text-xs text-gray-500 space-y-1">
-              <p><kbd className="bg-white px-1 rounded border">Delete</kbd> = skrýt prvek</p>
-              <p><kbd className="bg-white px-1 rounded border">↑↓←→</kbd> = posun</p>
-              <p><kbd className="bg-white px-1 rounded border">+/-</kbd> = velikost</p>
-              <p><kbd className="bg-white px-1 rounded border">Dvojklik</kbd> = editace textu</p>
             </div>
+          )}
 
-            {/* Actions */}
-            <div className="space-y-2 pt-4 border-t border-gray-200">
-              <Button variant="outline" onClick={handleReset} className="w-full">
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Reset vše
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold"
-              >
-                {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-                Uložit formát
-              </Button>
-            </div>
+          {/* Keyboard shortcuts */}
+          <div className="mb-5 p-3 bg-white/5 rounded-lg text-xs text-gray-400 space-y-1 border border-white/5">
+            <p><kbd className="bg-white/10 px-1 rounded border border-white/10 text-gray-300">Delete</kbd> = skrýt prvek</p>
+            <p><kbd className="bg-white/10 px-1 rounded border border-white/10 text-gray-300">↑↓←→</kbd> = posun</p>
+            <p><kbd className="bg-white/10 px-1 rounded border border-white/10 text-gray-300">+/-</kbd> = velikost</p>
+            <p><kbd className="bg-white/10 px-1 rounded border border-white/10 text-gray-300">Dvojklik</kbd> = editace textu</p>
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-2 pt-4 border-t border-white/10">
+            <Button variant="outline" onClick={handleReset} className="w-full">
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Reset vše
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold"
+            >
+              {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+              Uložit formát
+            </Button>
           </div>
         </div>
-
-        <canvas ref={canvasRef} className="hidden" />
       </div>
+
+      <canvas ref={canvasRef} className="hidden" />
     </div>
+
   )
 }
 

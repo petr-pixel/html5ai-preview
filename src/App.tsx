@@ -1,8 +1,3 @@
-/**
- * AdCreative Studio - Main App Entry
- */
-
-import React from 'react'
 import { AuthProvider } from '@/components/Auth'
 import { StorageProvider } from '@/components/StorageProvider'
 import { AppContent } from '@/AppContent'

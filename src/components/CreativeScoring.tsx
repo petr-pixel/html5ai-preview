@@ -94,44 +94,44 @@ async function analyzeVisualQuality(imageUrl: string): Promise<{
       canvas.height = size
       const ctx = canvas.getContext('2d')!
       ctx.drawImage(img, 0, 0, size, size)
-      
+
       const imageData = ctx.getImageData(0, 0, size, size)
       const data = imageData.data
-      
+
       let totalBrightness = 0
       let totalSaturation = 0
       let rSum = 0, gSum = 0, bSum = 0
       let rSq = 0, gSq = 0, bSq = 0
-      
+
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i], g = data[i + 1], b = data[i + 2]
         const brightness = (r + g + b) / 3
         totalBrightness += brightness
-        
+
         const max = Math.max(r, g, b)
         const min = Math.min(r, g, b)
         const saturation = max === 0 ? 0 : (max - min) / max
         totalSaturation += saturation
-        
+
         rSum += r; gSum += g; bSum += b
         rSq += r * r; gSq += g * g; bSq += b * b
       }
-      
+
       const pixels = data.length / 4
       const avgBrightness = totalBrightness / pixels
       const avgSaturation = totalSaturation / pixels
-      
+
       // Contrast (standard deviation)
       const rVar = (rSq / pixels) - Math.pow(rSum / pixels, 2)
       const gVar = (gSq / pixels) - Math.pow(gSum / pixels, 2)
       const bVar = (bSq / pixels) - Math.pow(bSum / pixels, 2)
       const contrast = Math.sqrt((rVar + gVar + bVar) / 3) / 128
-      
+
       // Normalize scores
       const brightnessScore = 100 - Math.abs(avgBrightness - 128) / 1.28
       const contrastScore = Math.min(100, contrast * 200)
       const colorfulnessScore = avgSaturation * 150
-      
+
       // Estimate sharpness via edge detection
       let edgeSum = 0
       for (let y = 1; y < size - 1; y++) {
@@ -144,9 +144,9 @@ async function analyzeVisualQuality(imageUrl: string): Promise<{
         }
       }
       const sharpnessScore = Math.min(100, edgeSum / (size * size) * 10)
-      
+
       const overallScore = (brightnessScore * 0.2 + contrastScore * 0.3 + colorfulnessScore * 0.25 + sharpnessScore * 0.25)
-      
+
       resolve({
         brightness: Math.round(brightnessScore),
         contrast: Math.round(contrastScore),
@@ -174,10 +174,10 @@ async function generateSaliencyMap(imageUrl: string): Promise<number[][]> {
       canvas.height = gridSize
       const ctx = canvas.getContext('2d')!
       ctx.drawImage(img, 0, 0, gridSize, gridSize)
-      
+
       const imageData = ctx.getImageData(0, 0, gridSize, gridSize)
       const data = imageData.data
-      
+
       // Calculate saliency based on contrast and saturation
       const grid: number[][] = []
       for (let y = 0; y < gridSize; y++) {
@@ -185,14 +185,14 @@ async function generateSaliencyMap(imageUrl: string): Promise<number[][]> {
         for (let x = 0; x < gridSize; x++) {
           const idx = (y * gridSize + x) * 4
           const r = data[idx], g = data[idx + 1], b = data[idx + 2]
-          
+
           // Luminance
           const lum = 0.299 * r + 0.587 * g + 0.114 * b
-          
+
           // Saturation
           const max = Math.max(r, g, b), min = Math.min(r, g, b)
           const sat = max === 0 ? 0 : (max - min) / max
-          
+
           // Edge detection (simple)
           let edge = 0
           if (x > 0 && x < gridSize - 1 && y > 0 && y < gridSize - 1) {
@@ -202,23 +202,23 @@ async function generateSaliencyMap(imageUrl: string): Promise<number[][]> {
             const bottom = (data[idx + gridSize * 4] + data[idx + gridSize * 4 + 1] + data[idx + gridSize * 4 + 2]) / 3
             edge = (Math.abs(left - right) + Math.abs(top - bottom)) / 510
           }
-          
+
           // Combine factors with center bias
           const centerX = Math.abs(x - gridSize / 2) / (gridSize / 2)
           const centerY = Math.abs(y - gridSize / 2) / (gridSize / 2)
           const centerBias = 1 - (centerX * 0.3 + centerY * 0.3)
-          
+
           // Rule of thirds bonus
           const thirdX = Math.min(Math.abs(x - gridSize / 3), Math.abs(x - gridSize * 2 / 3)) / (gridSize / 3)
           const thirdY = Math.min(Math.abs(y - gridSize / 3), Math.abs(y - gridSize * 2 / 3)) / (gridSize / 3)
           const thirdBonus = 1 - Math.min(thirdX, thirdY) * 0.2
-          
+
           const saliency = (sat * 0.3 + edge * 0.4 + centerBias * 0.2 + thirdBonus * 0.1) * 100
           row.push(Math.min(100, Math.round(saliency)))
         }
         grid.push(row)
       }
-      
+
       resolve(grid)
     }
     img.onerror = () => {
@@ -244,10 +244,10 @@ function scoreText(textOverlay?: TextOverlay): { score: number; issues: string[]
   if (!textOverlay?.enabled) {
     return { score: 40, issues: ['Chybí textový overlay - snižuje engagement'] }
   }
-  
+
   const issues: string[] = []
   let score = 100
-  
+
   // Headline
   if (!textOverlay.headline) {
     score -= 30
@@ -266,7 +266,7 @@ function scoreText(textOverlay?: TextOverlay): { score: number; issues: string[]
       issues.push('Headline by měl obsahovat číslo nebo končit ! nebo ?')
     }
   }
-  
+
   // CTA
   if (!textOverlay.cta) {
     score -= 25
@@ -278,7 +278,7 @@ function scoreText(textOverlay?: TextOverlay): { score: number; issues: string[]
       issues.push('CTA je slabé - použijte akční slovesa (Koupit, Objednat, Získat)')
     }
   }
-  
+
   return { score: Math.max(0, score), issues }
 }
 
@@ -289,23 +289,23 @@ function scoreCTA(textOverlay?: TextOverlay): { score: number; issues: string[] 
   if (!textOverlay?.cta) {
     return { score: 30, issues: ['Chybí CTA - kritické pro konverze'] }
   }
-  
+
   const issues: string[] = []
   let score = 100
-  
+
   // Délka
   if (textOverlay.cta.length > 20) {
     score -= 20
     issues.push('CTA je příliš dlouhé')
   }
-  
+
   // Akční slovesa
   const actionVerbs = ['koupit', 'objednat', 'získat', 'stáhnout', 'vyzkoušet', 'prohlédnout', 'rezervovat', 'buy', 'get', 'try', 'start', 'shop']
   if (!actionVerbs.some(v => textOverlay.cta.toLowerCase().includes(v))) {
     score -= 15
     issues.push('CTA by mělo začínat akčním slovesem')
   }
-  
+
   // Barva kontrast
   const ctaColor = textOverlay.ctaColor || '#f97316'
   // Simple check - orange/red/green are good
@@ -313,7 +313,7 @@ function scoreCTA(textOverlay?: TextOverlay): { score: number; issues: string[] 
     score -= 15
     issues.push('CTA barva má nízký kontrast')
   }
-  
+
   return { score: Math.max(0, score), issues }
 }
 
@@ -357,7 +357,7 @@ Maximálně 4 improvements, 3 strengths. Buď konkrétní a akční.`
       { prompt, maxTokens: 500, temperature: 0.7 },
       'standard'
     )
-    
+
     if (result.success && result.text) {
       // Parse JSON from response
       const jsonMatch = result.text.match(/\{[\s\S]*\}/)
@@ -368,7 +368,7 @@ Maximálně 4 improvements, 3 strengths. Buď konkrétní a akční.`
   } catch (e) {
     console.error('AI analysis failed:', e)
   }
-  
+
   // Fallback
   return {
     improvements: [
@@ -390,15 +390,15 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
   const [result, setResult] = useState<ScoringResult | null>(null)
   const [showHeatmap, setShowHeatmap] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  
+
   const effectiveImage = imageUrl || creative?.imageUrl
   const effectiveTextOverlay = textOverlay || globalTextOverlay
-  
+
   const analyze = async () => {
     if (!effectiveImage) return
-    
+
     setIsAnalyzing(true)
-    
+
     try {
       // Parallel analysis
       const [visualAnalysis, saliencyMap, textScore, ctaScore] = await Promise.all([
@@ -407,7 +407,7 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
         Promise.resolve(scoreText(effectiveTextOverlay)),
         Promise.resolve(scoreCTA(effectiveTextOverlay)),
       ])
-      
+
       // Composition score based on text position
       let compositionScore = 70
       if (effectiveTextOverlay?.position) {
@@ -416,10 +416,10 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
         if (effectiveTextOverlay.position.includes('left')) compositionScore += 10
       }
       compositionScore = Math.min(100, compositionScore)
-      
+
       // Brand consistency (placeholder - would need brand kit comparison)
       const brandScore = 75
-      
+
       const breakdown: ScoreBreakdown = {
         visual: visualAnalysis.score,
         text: textScore.score,
@@ -427,7 +427,7 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
         composition: compositionScore,
         brandConsistency: brandScore,
       }
-      
+
       // Weighted overall score
       const overallScore = Math.round(
         breakdown.visual * 0.25 +
@@ -436,14 +436,14 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
         breakdown.composition * 0.15 +
         breakdown.brandConsistency * 0.10
       )
-      
+
       // Get AI improvements if API key available
       let aiAnalysis = {
         improvements: [] as ScoringResult['improvements'],
         strengths: [] as string[],
         estimatedCTR: '0.5% - 1.5%'
       }
-      
+
       if (apiKeys.openai) {
         aiAnalysis = await getAIAnalysis(apiKeys.openai, effectiveImage, effectiveTextOverlay, visualAnalysis.score)
       } else {
@@ -472,16 +472,16 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
             impact: '+5-8% CTR'
           })
         }
-        
+
         aiAnalysis.strengths = []
         if (visualAnalysis.score > 70) aiAnalysis.strengths.push('Kvalitní vizuál')
         if (textScore.score > 70) aiAnalysis.strengths.push('Efektivní texty')
         if (ctaScore.score > 70) aiAnalysis.strengths.push('Silné CTA')
       }
-      
+
       // Engagement level
       const engagementLevel = overallScore >= 80 ? 'high' : overallScore >= 60 ? 'medium' : 'low'
-      
+
       setResult({
         overallScore,
         breakdown,
@@ -497,14 +497,14 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
     } catch (error) {
       console.error('Analysis failed:', error)
     }
-    
+
     setIsAnalyzing(false)
   }
-  
+
   // Draw heatmap
   useEffect(() => {
     if (!showHeatmap || !result?.heatmapData || !canvasRef.current || !effectiveImage) return
-    
+
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')!
     const img = new Image()
@@ -513,17 +513,17 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
       canvas.width = img.width
       canvas.height = img.height
       ctx.drawImage(img, 0, 0)
-      
+
       // Overlay heatmap
       const gridSize = result.heatmapData!.length
       const cellWidth = img.width / gridSize
       const cellHeight = img.height / gridSize
-      
+
       for (let y = 0; y < gridSize; y++) {
         for (let x = 0; x < gridSize; x++) {
           const value = result.heatmapData![y][x]
           const alpha = value / 200 // Max 0.5 opacity
-          
+
           // Color gradient: blue (low) -> green -> yellow -> red (high)
           let r, g, b
           if (value < 33) {
@@ -535,27 +535,27 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
             const t = (value - 66) / 34
             r = 255; g = Math.round(255 * (1 - t)); b = 0
           }
-          
-          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`
+
+          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha * 0.8})` // Slightly reduced alpha for dark mode
           ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight)
         }
       }
     }
     img.src = effectiveImage
   }, [showHeatmap, result, effectiveImage])
-  
+
   const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600'
-    if (score >= 60) return 'text-yellow-600'
-    return 'text-red-600'
+    if (score >= 80) return 'text-emerald-400'
+    if (score >= 60) return 'text-amber-400'
+    return 'text-red-400'
   }
-  
+
   const getScoreBg = (score: number) => {
-    if (score >= 80) return 'bg-green-500'
-    if (score >= 60) return 'bg-yellow-500'
-    return 'bg-red-500'
+    if (score >= 80) return 'bg-gradient-to-br from-emerald-500 to-green-600 shadow-emerald-500/20'
+    if (score >= 60) return 'bg-gradient-to-br from-amber-500 to-yellow-600 shadow-amber-500/20'
+    return 'bg-gradient-to-br from-red-500 to-orange-600 shadow-red-500/20'
   }
-  
+
   const getGrade = (score: number) => {
     if (score >= 90) return 'A+'
     if (score >= 80) return 'A'
@@ -566,40 +566,40 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
   }
 
   return (
-    <div className="bg-white rounded-xl border shadow-lg overflow-hidden">
+    <div className="bg-[#0F1115]/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b bg-gradient-to-r from-purple-50 to-pink-50">
+      <div className="px-6 py-4 border-b border-white/10 bg-white/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Sparkles className="w-5 h-5 text-purple-600" />
+            <div className="p-2 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg shadow-lg shadow-violet-500/20">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">Creative Scoring AI</h3>
-              <p className="text-sm text-gray-500">Predikce výkonu a doporučení</p>
+              <h3 className="font-semibold text-white">Creative Scoring AI</h3>
+              <p className="text-sm text-white/50">Predikce výkonu a doporučení</p>
             </div>
           </div>
           {onClose && (
-            <Button variant="ghost" size="sm" onClick={onClose}>×</Button>
+            <Button variant="ghost" size="sm" onClick={onClose} className="text-white/50 hover:text-white hover:bg-white/10">×</Button>
           )}
         </div>
       </div>
-      
+
       <div className="p-6">
         {/* Preview & Analyze */}
         {!result && (
           <div className="text-center py-8">
             {effectiveImage && (
-              <img 
-                src={effectiveImage} 
-                alt="Preview" 
+              <img
+                src={effectiveImage}
+                alt="Preview"
                 className="max-h-48 mx-auto rounded-lg shadow mb-6"
               />
             )}
             <Button
               onClick={analyze}
               disabled={isAnalyzing || !effectiveImage}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+              className="bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 shadow-lg shadow-violet-500/20"
             >
               {isAnalyzing ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Analyzuji...</>
@@ -612,11 +612,11 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
               )}
             </Button>
             {!effectiveImage && (
-              <p className="text-sm text-gray-500 mt-3">Nejprve vyberte obrázek k analýze</p>
+              <p className="text-sm text-white/40 mt-3">Nejprve vyberte obrázek k analýze</p>
             )}
           </div>
         )}
-        
+
         {/* Results */}
         {result && (
           <div className="space-y-6">
@@ -629,32 +629,36 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
                 )}>
                   {result.overallScore}
                 </div>
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-0.5 rounded font-bold">
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur border border-white/10 text-white text-xs px-2 py-0.5 rounded font-bold shadow-lg">
                   {getGrade(result.overallScore)}
                 </div>
               </div>
-              
+
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">Odhadované CTR:</span>
+                  <span className="text-sm text-white/50">Odhadované CTR:</span>
                   <span className="font-semibold">{result.predictions.estimatedCTR}</span>
                 </div>
                 <div className="flex items-center gap-2 mb-2">
                   <Target className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">Engagement:</span>
-                  <Badge variant={result.predictions.engagementLevel === 'high' ? 'default' : result.predictions.engagementLevel === 'medium' ? 'secondary' : 'outline'}>
-                    {result.predictions.engagementLevel === 'high' ? 'Vysoký' : result.predictions.engagementLevel === 'medium' ? 'Střední' : 'Nízký'}
+                  <span className="text-sm text-white/50">Engagement:</span>
+                  <Badge variant="outline" className={cn(
+                    "border-white/10 bg-white/5",
+                    result.predictions.engagementLevel === 'high' ? 'text-emerald-400 border-emerald-500/30' :
+                      result.predictions.engagementLevel === 'medium' ? 'text-amber-400 border-amber-500/30' :
+                        'text-white/40 border-white/10'
+                  )}>
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">Audience match:</span>
+                  <span className="text-sm text-white/50">Audience match:</span>
                   <span className="font-semibold">{result.predictions.audienceMatch}%</span>
                 </div>
               </div>
             </div>
-            
+
             {/* Breakdown */}
             <div className="grid grid-cols-5 gap-3">
               {[
@@ -664,31 +668,32 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
                 { key: 'composition', label: 'Kompozice', icon: Layout },
                 { key: 'brandConsistency', label: 'Brand', icon: Zap },
               ].map(({ key, label, icon: Icon }) => (
-                <div key={key} className="text-center p-3 bg-gray-50 rounded-lg">
-                  <Icon className="w-4 h-4 mx-auto mb-1 text-gray-400" />
+                <div key={key} className="text-center p-3 bg-white/5 border border-white/10 rounded-lg">
+                  <Icon className="w-4 h-4 mx-auto mb-1 text-white/40" />
                   <div className={cn("text-lg font-bold", getScoreColor(result.breakdown[key as keyof ScoreBreakdown]))}>
                     {result.breakdown[key as keyof ScoreBreakdown]}
                   </div>
-                  <div className="text-xs text-gray-500">{label}</div>
+                  <div className="text-xs text-white/40">{label}</div>
                 </div>
               ))}
             </div>
-            
+
             {/* Heatmap toggle */}
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg">
               <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4 text-gray-400" />
-                <span className="text-sm font-medium">Heatmapa pozornosti</span>
+                <Eye className="w-4 h-4 text-white/40" />
+                <span className="text-sm font-medium text-white/80">Heatmapa pozornosti</span>
               </div>
               <Button
-                variant={showHeatmap ? 'default' : 'outline'}
+                variant={showHeatmap ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => setShowHeatmap(!showHeatmap)}
+                className={cn(showHeatmap ? "bg-violet-500/20 text-violet-300 hover:bg-violet-500/30" : "text-white/50 hover:bg-white/5 hover:text-white")}
               >
                 {showHeatmap ? 'Skrýt' : 'Zobrazit'}
               </Button>
             </div>
-            
+
             {showHeatmap && (
               <div className="relative">
                 <canvas ref={canvasRef} className="w-full rounded-lg" />
@@ -699,56 +704,56 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
                 </div>
               </div>
             )}
-            
+
             {/* Strengths */}
             {result.strengths.length > 0 && (
               <div>
-                <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
+                <h4 className="font-medium text-white mb-2 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-500" />
                   Silné stránky
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {result.strengths.map((s, i) => (
-                    <Badge key={i} variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    <Badge key={i} variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
                       {s}
                     </Badge>
                   ))}
                 </div>
               </div>
             )}
-            
+
             {/* Improvements */}
             {result.improvements.length > 0 && (
               <div>
-                <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                  <Lightbulb className="w-4 h-4 text-yellow-500" />
+                <h4 className="font-medium text-white mb-3 flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-amber-500" />
                   Doporučení pro zlepšení
                 </h4>
                 <div className="space-y-2">
                   {result.improvements.map((imp, i) => (
-                    <div 
+                    <div
                       key={i}
                       className={cn(
-                        "p-3 rounded-lg border-l-4",
-                        imp.priority === 'high' ? 'bg-red-50 border-red-400' :
-                        imp.priority === 'medium' ? 'bg-yellow-50 border-yellow-400' :
-                        'bg-blue-50 border-blue-400'
+                        "p-3 rounded-lg border-l-4 bg-white/5 border border-white/5",
+                        imp.priority === 'high' ? 'border-l-red-500' :
+                          imp.priority === 'medium' ? 'border-l-amber-500' :
+                            'border-l-blue-500'
                       )}
                     >
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{imp.suggestion}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Kategorie: {imp.category} • Dopad: <span className="font-semibold text-green-600">{imp.impact}</span>
+                          <p className="text-sm font-medium text-white">{imp.suggestion}</p>
+                          <p className="text-xs text-white/50 mt-1">
+                            Kategorie: {imp.category} • Dopad: <span className="font-semibold text-emerald-400">{imp.impact}</span>
                           </p>
                         </div>
-                        <Badge 
+                        <Badge
                           variant="outline"
                           className={cn(
-                            "text-xs",
-                            imp.priority === 'high' ? 'border-red-300 text-red-600' :
-                            imp.priority === 'medium' ? 'border-yellow-300 text-yellow-600' :
-                            'border-blue-300 text-blue-600'
+                            "text-xs bg-white/5",
+                            imp.priority === 'high' ? 'border-red-500/30 text-red-400' :
+                              imp.priority === 'medium' ? 'border-amber-500/30 text-amber-400' :
+                                'border-blue-500/30 text-blue-400'
                           )}
                         >
                           {imp.priority === 'high' ? 'Vysoká' : imp.priority === 'medium' ? 'Střední' : 'Nízká'}
@@ -759,10 +764,10 @@ export function CreativeScoring({ creative, imageUrl, textOverlay, onClose }: Cr
                 </div>
               </div>
             )}
-            
+
             {/* Re-analyze */}
-            <div className="flex justify-center pt-4 border-t">
-              <Button variant="outline" onClick={analyze} disabled={isAnalyzing}>
+            <div className="flex justify-center pt-4 border-t border-white/10">
+              <Button variant="ghost" onClick={analyze} disabled={isAnalyzing} className="text-white/60 hover:text-white hover:bg-white/10 border border-white/10">
                 <RefreshCw className={cn("w-4 h-4 mr-2", isAnalyzing && "animate-spin")} />
                 Analyzovat znovu
               </Button>

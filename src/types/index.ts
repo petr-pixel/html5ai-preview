@@ -162,14 +162,14 @@ export interface Creative {
   platform: PlatformId
   category: string
   format: Format
-  
+
   // === NOVÝ SYSTÉM: Oddělené vrstvy ===
   baseImageUrl: string           // Obrázek BEZ textu
   textLayer?: TextLayer          // Textová vrstva (editovatelná per-formát)
-  
+
   // === Legacy (pro zpětnou kompatibilitu) ===
   imageUrl: string               // Finální renderovaný obrázek (s textem)
-  
+
   createdAt: Date
   variant?: 'A' | 'B' | 'C'
   sourceVariantId?: string
@@ -202,6 +202,13 @@ export interface TextOverlay {
   position: 'top-left' | 'top-center' | 'top-right' | 'center' | 'bottom-left' | 'bottom-center' | 'bottom-right'
   ctaColor: string
   fontSize: 'small' | 'medium' | 'large'
+  shadow?: {
+    enabled: boolean
+    color: string
+    blur: number
+    offsetX: number
+    offsetY: number
+  }
 }
 
 // ============================================================================
@@ -280,7 +287,7 @@ export interface QRCode {
 export interface BrandKit {
   id: string
   name: string
-  
+
   // ===== LOGA =====
   logoMain?: string           // Hlavní logo (PNG s průhledností)
   logoLight?: string          // Světlá verze (pro tmavé pozadí)
@@ -288,7 +295,7 @@ export interface BrandKit {
   // Deprecated - pro zpětnou kompatibilitu
   logoSquare?: string
   logoHorizontal?: string
-  
+
   // ===== BARVY =====
   primaryColor: string        // Hlavní barva (CTA, akcenty)
   secondaryColor: string      // Sekundární (pozadí textů, rámečky)
@@ -298,12 +305,12 @@ export interface BrandKit {
   ctaColor?: string
   textColor?: string
   backgroundColor?: string
-  
+
   // ===== TEXTOVÉ ŠABLONY =====
   headlineTemplates: string[]  // ["Objevte {produkt}", "Sleva {sleva}%", ...]
   ctaTemplates: string[]       // ["Koupit nyní", "Zjistit více", ...]
   tagline?: string             // Firemní slogan
-  
+
   // ===== PRAVIDLA LOGA =====
   logoRules: {
     autoApply: boolean         // Automaticky přidávat na kreativy
@@ -313,16 +320,16 @@ export interface BrandKit {
     opacity: number            // 0-100
     autoSelectVariant: boolean // Automaticky vybrat light/dark podle pozadí
   }
-  
+
   // ===== FONTY =====
   headlineFont?: string
   bodyFont?: string
-  
+
   // ===== METADATA =====
   createdAt: Date
   updatedAt?: Date
   isDefault: boolean
-  
+
   // Deprecated
   defaultCTA?: Record<string, string>
 }
@@ -444,7 +451,7 @@ export interface AppState {
   category: string
   setPlatform: (platform: PlatformId) => void
   setCategory: (category: string) => void
-  
+
   // Source
   prompt: string
   sourceFormat: 'landscape' | 'square' | 'portrait'
@@ -462,70 +469,70 @@ export interface AppState {
   setSourceVariants: (variants: SourceImageVariant[]) => void
   addSourceVariant: (variant: SourceImageVariant) => void
   setActiveSourceVariant: (id: string | null) => void
-  
+
   // Format output settings (per-format crop, HTML5 toggle)
   formatOutputSettings: Record<string, FormatOutputSettings>
   setFormatOutputSettings: (key: string, settings: Partial<FormatOutputSettings>) => void
-  
+
   // Selection
   selectedFormats: Set<string>
   toggleFormat: (key: string) => void
   selectAllFormats: (keys: string[]) => void
   clearSelection: () => void
-  
+
   // Creatives
   creatives: Record<string, Creative>
   addCreatives: (creatives: Creative[]) => void
   deleteCreative: (id: string) => void
   deleteCreatives: (ids: string[]) => void
   clearCreatives: () => void
-  
+
   // Text Overlay
   textOverlay: TextOverlay
   setTextOverlay: (overlay: Partial<TextOverlay>) => void
-  
+
   // Per-format text settings
   perFormatTextSettings: Record<string, PerFormatTextSettings>
   setPerFormatTextSettings: (formatKey: string, settings: Partial<PerFormatTextSettings>) => void
   resetPerFormatTextSettings: () => void
-  
+
   // Outpainted images per format
   outpaintedImages: Record<string, string>
   setOutpaintedImage: (formatKey: string, imageUrl: string) => void
   clearOutpaintedImage: (formatKey: string) => void
   clearAllOutpaintedImages: () => void
-  
+
   // Watermark
   watermark: Watermark
   setWatermark: (watermark: Partial<Watermark>) => void
-  
+
   // QR Code
   qrCode: QRCode
   setQRCode: (qrCode: Partial<QRCode>) => void
-  
+
   // Video Scenario
   videoScenario: VideoScenario
   setVideoScenario: (scenario: Partial<VideoScenario>) => void
-  
+
   // A/B Testing
   abVariants: ABVariant[]
   activeVariant: 'A' | 'B' | 'C'
   setABVariants: (variants: ABVariant[]) => void
   setActiveVariant: (variant: 'A' | 'B' | 'C') => void
-  
+
   // Brand Kit
   brandKits: BrandKit[]
   activeBrandKit: string | null
   setBrandKits: (kits: BrandKit[]) => void
   addBrandKit: (kit: BrandKit) => void
   setActiveBrandKit: (id: string | null) => void
-  
+
   // History
   history: HistoryItem[]
   addToHistory: (item: HistoryItem) => void
   clearHistory: () => void
   loadFromHistory: (item: HistoryItem) => void
-  
+
   // Model tiers
   textModelTier: ModelTier
   imageModelTier: ModelTier
@@ -533,11 +540,11 @@ export interface AppState {
   setTextModelTier: (tier: ModelTier) => void
   setImageModelTier: (tier: ModelTier) => void
   setVideoModelTier: (tier: ModelTier) => void
-  
+
   // API Keys
   apiKeys: ApiKeys
   setApiKeys: (keys: Partial<ApiKeys>) => void
-  
+
   // UI State
   isGenerating: boolean
   progress: number

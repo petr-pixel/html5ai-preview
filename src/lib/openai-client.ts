@@ -18,9 +18,10 @@ export interface OpenAIConfig {
 
 export interface ImageGenerationParams {
   prompt: string
-  size: '1024x1024' | '1536x1024' | '1024x1536' | '1792x1024' | '1024x1792' | 'auto'
-  quality: 'low' | 'medium' | 'high' | 'auto'
+  size: '1024x1024' | '1792x1024' | '1024x1792' | 'auto'
+  quality: 'standard' | 'hd' | 'auto'
   n?: number
+  style?: 'natural' | 'vivid'
 }
 
 export interface ImageGenerationResult {
@@ -79,7 +80,7 @@ export async function testApiKey(apiKey: string): Promise<ApiKeyTestResult> {
   if (!apiKey || apiKey.length < 10) {
     return { valid: false, error: 'Klíč je příliš krátký' }
   }
-  
+
   try {
     const response = await fetch('https://api.openai.com/v1/models', {
       method: 'GET',
@@ -87,7 +88,7 @@ export async function testApiKey(apiKey: string): Promise<ApiKeyTestResult> {
         Authorization: `Bearer ${apiKey}`,
       },
     })
-    
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({}))
       if (response.status === 401) {
@@ -98,22 +99,22 @@ export async function testApiKey(apiKey: string): Promise<ApiKeyTestResult> {
       }
       return { valid: false, error: error.error?.message || `Chyba ${response.status}` }
     }
-    
+
     const data = await response.json()
     const models = data.data?.map((m: any) => m.id) || []
-    
+
     // Zkontroluj, zda má přístup k potřebným modelům
     const hasDALLE = models.some((m: string) => m.includes('dall-e'))
     const hasGPT4 = models.some((m: string) => m.includes('gpt-4'))
-    
+
     if (!hasDALLE && !hasGPT4) {
-      return { 
-        valid: true, 
+      return {
+        valid: true,
         models,
-        error: 'Klíč funguje, ale nemá přístup k DALL-E nebo GPT-4' 
+        error: 'Klíč funguje, ale nemá přístup k DALL-E nebo GPT-4'
       }
     }
-    
+
     return { valid: true, models }
   } catch (error: any) {
     return { valid: false, error: error.message || 'Nepodařilo se připojit k API' }
@@ -125,40 +126,38 @@ export async function testApiKey(apiKey: string): Promise<ApiKeyTestResult> {
 // ============================================================================
 
 export const PRICING = {
-  // GPT-4o Image Generation (gpt-image-1)
-  // Pricing: low=$0.011, medium=$0.042, high=$0.167 per image (1024x1024)
+  // GPT-4o Image Generation (dall-e-3)
+  // Pricing: standard=$0.040, hd=$0.080 per image (1024x1024)
   images: {
-    '1024x1024': { low: 0.011, medium: 0.042, high: 0.167 },
-    '1536x1024': { low: 0.016, medium: 0.063, high: 0.250 },
-    '1024x1536': { low: 0.016, medium: 0.063, high: 0.250 },
-    '1792x1024': { low: 0.016, medium: 0.063, high: 0.250 },
-    '1024x1792': { low: 0.016, medium: 0.063, high: 0.250 },
-    'auto': { low: 0.011, medium: 0.042, high: 0.167 },
+    '1024x1024': { standard: 0.040, hd: 0.080 },
+    '1792x1024': { standard: 0.080, hd: 0.120 }, // Wide
+    '1024x1792': { standard: 0.080, hd: 0.120 }, // Tall
+    'auto': { standard: 0.040, hd: 0.080 },
   },
   // Chat Completions - per 1M tokens
   text: {
-    'gpt-4o-mini': { input: 0.15, output: 0.60 },
+    'gpt-4o-mini': { input: 0.15, output: 0.40 }, // Updated pricing
     'gpt-4o': { input: 2.50, output: 10.00 },
   },
   // Video - Sora 2 (per second)
   video: {
-    'sora-2': 0.10, // $0.10/sec - levnější varianta
-    'sora-2-pro': 0.40, // $0.40/sec - vyšší kvalita
+    'sora-2': 0.10,
+    'sora-2-pro': 0.40,
   },
 } as const
 
 // ============================================================================
-// HELPER: Model tier to actual model
+// HELPER: Model tier to actual model parameters
 // ============================================================================
 
-export function getImageModel(tier: ModelTier): { quality: 'low' | 'medium' | 'high' } {
+export function getImageParams(tier: ModelTier): { quality: 'standard' | 'hd', style: 'natural' | 'vivid' } {
   switch (tier) {
     case 'cheap':
-      return { quality: 'low' }
+      return { quality: 'standard', style: 'natural' }
     case 'standard':
-      return { quality: 'medium' }
+      return { quality: 'standard', style: 'vivid' }
     case 'best':
-      return { quality: 'high' }
+      return { quality: 'hd', style: 'vivid' }
   }
 }
 
@@ -167,7 +166,7 @@ export function getTextModel(tier: ModelTier): string {
     case 'cheap':
       return 'gpt-4o-mini'
     case 'standard':
-      return 'gpt-4o-mini'
+      return 'gpt-4o-mini' // 4o-mini is now standard default
     case 'best':
       return 'gpt-4o'
   }
@@ -185,7 +184,7 @@ export function getVideoModel(tier: ModelTier): 'sora-2' | 'sora-2-pro' {
 }
 
 // ============================================================================
-// IMAGE GENERATION (GPT-4o / gpt-image-1)
+// IMAGE GENERATION (DALL-E 3)
 // ============================================================================
 
 export async function generateImage(
@@ -200,12 +199,13 @@ export async function generateImage(
         Authorization: `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-image-1',
+        model: 'dall-e-3',
         prompt: params.prompt,
-        size: params.size,
-        quality: params.quality,
-        n: params.n || 1,
-        output_format: 'png',
+        size: params.size === 'auto' ? '1024x1024' : params.size,
+        quality: params.quality === 'auto' ? 'standard' : params.quality,
+        n: 1, // DALL-E 3 supports only n=1
+        style: 'vivid', // Default to vivid for ads
+        response_format: 'b64_json',
       }),
     })
 
@@ -215,7 +215,7 @@ export async function generateImage(
     }
 
     const data = await response.json()
-    
+
     // GPT-4o returns b64_json
     const images = data.data.map((item: any) => {
       if (item.b64_json) {
@@ -516,36 +516,35 @@ export async function generateImageVariants(
   size: ImageGenerationParams['size'] = '1024x1024',
   quality: 'standard' | 'hd' = 'standard'
 ): Promise<ImageGenerationResult> {
-  // Generujeme více obrázků najednou pokud možno
-  if (count <= 4) {
-    return generateImage(config, {
-      prompt: basePrompt,
-      size,
-      quality,
-      n: count,
-    })
-  }
-
-  // Pro více než 4 musíme volat vícekrát
+  // DALL-E 3 supports only n=1, so we must make parallel requests for variants
   const results: string[] = []
   let totalCost = 0
+  const errors: string[] = []
 
-  const batches = Math.ceil(count / 4)
-  for (let i = 0; i < batches; i++) {
-    const batchSize = Math.min(4, count - i * 4)
-    const result = await generateImage(config, {
+  // Create array of promises
+  const promises = Array(count).fill(0).map(() =>
+    generateImage(config, {
       prompt: basePrompt,
       size,
       quality,
-      n: batchSize,
+      n: 1, // Always 1 for DALL-E 3
+      style: 'vivid'
     })
+  )
 
+  const responses = await Promise.all(promises)
+
+  for (const result of responses) {
     if (result.success) {
       results.push(...result.images)
       totalCost += result.cost || 0
     } else {
-      return { success: false, images: results, error: result.error, cost: totalCost }
+      errors.push(result.error || 'Unknown error')
     }
+  }
+
+  if (results.length === 0 && errors.length > 0) {
+    return { success: false, images: [], error: errors[0], cost: totalCost }
   }
 
   return { success: true, images: results, cost: totalCost }
@@ -580,24 +579,24 @@ export async function outpaintImage(
   // DALL-E 2 podporuje jen čtvercové obrázky: 1024x1024, 512x512, 256x256
   const dalleSize = 1024
   const scale = dalleSize / Math.max(params.targetWidth, params.targetHeight)
-  
+
   // Vycentrujeme target oblast v DALL-E canvasu
   const targetOffsetX = (dalleSize - params.targetWidth * scale) / 2
   const targetOffsetY = (dalleSize - params.targetHeight * scale) / 2
-  
+
   try {
     // Vytvoř canvas pro přípravu obrázku
     const img = await loadImageFromDataUrl(params.image)
-    
+
     const srcRatio = img.width / img.height
     const tgtRatio = params.targetWidth / params.targetHeight
-    
+
     // Určíme kam umístit zdrojový obrázek
     let drawX = 0
     let drawY = 0
     let drawWidth = params.targetWidth
     let drawHeight = params.targetHeight
-    
+
     if (srcRatio > tgtRatio) {
       // Zdrojový je širší - potřebujeme rozšířit nahoru/dolů
       drawWidth = params.targetWidth
@@ -609,28 +608,28 @@ export async function outpaintImage(
       drawWidth = params.targetHeight * srcRatio
       drawX = (params.targetWidth - drawWidth) / 2
     }
-    
+
     // Pozice zdrojového obrázku ve scaled prostoru
     const scaledDrawX = targetOffsetX + drawX * scale
     const scaledDrawY = targetOffsetY + drawY * scale
     const scaledDrawWidth = drawWidth * scale
     const scaledDrawHeight = drawHeight * scale
-    
+
     // Vytvoř RGBA canvas pro DALL-E (průhledné oblasti = dogenerovat)
     const canvas = document.createElement('canvas')
     canvas.width = dalleSize
     canvas.height = dalleSize
     const ctx = canvas.getContext('2d')!
-    
+
     // Celý canvas průhledný
     ctx.clearRect(0, 0, dalleSize, dalleSize)
-    
+
     // Nakresli zdrojový obrázek - tato oblast zůstane, zbytek je průhledný
     ctx.drawImage(img, scaledDrawX, scaledDrawY, scaledDrawWidth, scaledDrawHeight)
-    
+
     // Konvertuj na PNG blob (zachová průhlednost)
     const imageBlob = await canvasToBlob(canvas, 'image/png')
-    
+
     // DALL-E 2 edit API: průhledné oblasti v obrázku = dogenerovat
     // Mask není potřeba pokud obrázek má průhlednost
     const formData = new FormData()
@@ -640,7 +639,7 @@ export async function outpaintImage(
     formData.append('n', '1')
     formData.append('size', '1024x1024')
     formData.append('response_format', 'b64_json')
-    
+
     const response = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
       headers: {
@@ -648,39 +647,39 @@ export async function outpaintImage(
       },
       body: formData,
     })
-    
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({}))
       console.warn('DALL-E 2 outpainting failed:', error)
       // Fallback na blur fill
       return blurFillFallback(params)
     }
-    
+
     const data = await response.json()
     const resultB64 = data.data?.[0]?.b64_json
-    
+
     if (!resultB64) {
       return blurFillFallback(params)
     }
-    
+
     // Resize zpět na cílovou velikost
     const resultImg = await loadImageFromDataUrl(`data:image/png;base64,${resultB64}`)
-    
+
     const finalCanvas = document.createElement('canvas')
     finalCanvas.width = params.targetWidth
     finalCanvas.height = params.targetHeight
     const finalCtx = finalCanvas.getContext('2d')!
-    
+
     // Crop jen požadovanou oblast z DALL-E výstupu
     const cropWidth = params.targetWidth * scale
     const cropHeight = params.targetHeight * scale
-    
+
     finalCtx.drawImage(
-      resultImg, 
+      resultImg,
       targetOffsetX, targetOffsetY, cropWidth, cropHeight,
       0, 0, params.targetWidth, params.targetHeight
     )
-    
+
     return {
       success: true,
       image: finalCanvas.toDataURL('image/png'),
@@ -698,21 +697,21 @@ export async function outpaintImage(
 async function blurFillFallback(params: OutpaintingParams): Promise<OutpaintingResult> {
   try {
     const img = await loadImageFromDataUrl(params.image)
-    
+
     const canvas = document.createElement('canvas')
     canvas.width = params.targetWidth
     canvas.height = params.targetHeight
     const ctx = canvas.getContext('2d')!
-    
+
     const srcRatio = img.width / img.height
     const tgtRatio = params.targetWidth / params.targetHeight
-    
+
     // Vypočítej kam nakreslit ostrý obrázek
     let drawX = 0
     let drawY = 0
     let drawWidth = params.targetWidth
     let drawHeight = params.targetHeight
-    
+
     if (srcRatio > tgtRatio) {
       drawWidth = params.targetWidth
       drawHeight = params.targetWidth / srcRatio
@@ -722,12 +721,12 @@ async function blurFillFallback(params: OutpaintingParams): Promise<OutpaintingR
       drawWidth = params.targetHeight * srcRatio
       drawX = (params.targetWidth - drawWidth) / 2
     }
-    
+
     // 1. Nakresli silně rozmazané pozadí (celý obrázek roztažený přes celý canvas)
     ctx.filter = 'blur(40px) saturate(1.1)'
     ctx.drawImage(img, -50, -50, params.targetWidth + 100, params.targetHeight + 100)
     ctx.filter = 'none'
-    
+
     // 2. Přidej jemný gradient overlay pro lepší splynutí
     const gradient = ctx.createRadialGradient(
       params.targetWidth / 2, params.targetHeight / 2, Math.min(drawWidth, drawHeight) / 3,
@@ -737,7 +736,7 @@ async function blurFillFallback(params: OutpaintingParams): Promise<OutpaintingR
     gradient.addColorStop(1, 'rgba(0,0,0,0.15)')
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, params.targetWidth, params.targetHeight)
-    
+
     // 3. Nakresli ostrý obrázek do středu s jemným stínem pro hloubku
     ctx.shadowColor = 'rgba(0,0,0,0.3)'
     ctx.shadowBlur = 20
@@ -746,7 +745,7 @@ async function blurFillFallback(params: OutpaintingParams): Promise<OutpaintingR
     ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
     ctx.shadowColor = 'transparent'
     ctx.shadowBlur = 0
-    
+
     return {
       success: true,
       image: canvas.toDataURL('image/png'),

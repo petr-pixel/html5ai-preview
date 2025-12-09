@@ -159,7 +159,7 @@ const TEMPLATES: Template[] = [
     tags: ['doprava', 'shipping', 'zdarma'],
     popularity: 4,
   },
-  
+
   // FOOD & RESTAURANT
   {
     id: 'food-restaurant',
@@ -216,7 +216,7 @@ const TEMPLATES: Template[] = [
     tags: ['delivery', 'rozvoz', 'jídlo'],
     popularity: 5,
   },
-  
+
   // REAL ESTATE
   {
     id: 'realestate-sale',
@@ -246,7 +246,7 @@ const TEMPLATES: Template[] = [
     tags: ['reality', 'byt', 'dům', 'prodej'],
     popularity: 4,
   },
-  
+
   // AUTOMOTIVE
   {
     id: 'auto-sale',
@@ -302,7 +302,7 @@ const TEMPLATES: Template[] = [
     tags: ['servis', 'STK', 'pneumatiky'],
     popularity: 3,
   },
-  
+
   // TRAVEL
   {
     id: 'travel-vacation',
@@ -333,7 +333,7 @@ const TEMPLATES: Template[] = [
     popularity: 5,
     isNew: true,
   },
-  
+
   // HEALTH & BEAUTY
   {
     id: 'beauty-salon',
@@ -362,7 +362,7 @@ const TEMPLATES: Template[] = [
     tags: ['kosmetika', 'wellness', 'masáže'],
     popularity: 4,
   },
-  
+
   // B2B / SAAS
   {
     id: 'saas-trial',
@@ -437,26 +437,26 @@ const INDUSTRIES = [
 
 export function TemplateLibrary({ onApply, onClose }: TemplateLibraryProps) {
   const { setTextOverlay, addBrandKit, setBrandKits, brandKits } = useAppStore()
-  
+
   const [search, setSearch] = useState('')
   const [selectedIndustry, setSelectedIndustry] = useState('all')
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [previewMode, setPreviewMode] = useState(false)
-  
+
   // Filter templates
   const filteredTemplates = useMemo(() => {
     return TEMPLATES.filter(t => {
-      const matchesSearch = search === '' || 
+      const matchesSearch = search === '' ||
         t.name.toLowerCase().includes(search.toLowerCase()) ||
         t.description.toLowerCase().includes(search.toLowerCase()) ||
         t.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
-      
+
       const matchesIndustry = selectedIndustry === 'all' || t.industry === selectedIndustry
-      
+
       return matchesSearch && matchesIndustry
     }).sort((a, b) => b.popularity - a.popularity)
   }, [search, selectedIndustry])
-  
+
   // Apply template
   const handleApply = (template: Template) => {
     // Apply text overlay
@@ -467,11 +467,11 @@ export function TemplateLibrary({ onApply, onClose }: TemplateLibraryProps) {
       cta: template.ctas[0],
       ctaColor: template.colors.primary,
     })
-    
+
     onApply?.(template)
     onClose?.()
   }
-  
+
   // Create brand kit from template
   const handleCreateBrandKit = (template: Template) => {
     const newKit = {
@@ -487,48 +487,48 @@ export function TemplateLibrary({ onApply, onClose }: TemplateLibraryProps) {
       isDefault: false,
       createdAt: new Date(),
     }
-    
+
     addBrandKit(newKit)
     alert(`Brand Kit "${newKit.name}" byl vytvořen!`)
   }
 
   return (
-    <div className="bg-white rounded-xl border shadow-lg overflow-hidden max-w-4xl w-full max-h-[90vh] flex flex-col">
+    <div className="bg-[#0F1115]/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden max-w-4xl w-full max-h-[90vh] flex flex-col">
       {/* Header */}
-      <div className="px-6 py-4 border-b bg-gradient-to-r from-indigo-50 to-purple-50 flex-shrink-0">
+      <div className="px-6 py-4 border-b border-white/10 bg-white/5 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <LayoutTemplate className="w-5 h-5 text-indigo-600" />
+            <div className="p-2 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-lg shadow-lg shadow-indigo-500/20">
+              <LayoutTemplate className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">Knihovna šablon</h3>
-              <p className="text-sm text-gray-500">{TEMPLATES.length} profesionálních šablon</p>
+              <h3 className="font-semibold text-white">Knihovna šablon</h3>
+              <p className="text-sm text-white/50">{TEMPLATES.length} profesionálních šablon</p>
             </div>
           </div>
           {onClose && (
-            <Button variant="ghost" size="sm" onClick={onClose}>×</Button>
+            <Button variant="ghost" size="sm" onClick={onClose} className="text-white/50 hover:text-white hover:bg-white/10">×</Button>
           )}
         </div>
       </div>
-      
+
       {/* Search & Filters */}
-      <div className="px-6 py-4 border-b flex-shrink-0">
+      <div className="px-6 py-4 border-b border-white/10 flex-shrink-0">
         <div className="flex gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Hledat šablony..."
-              className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
+              className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-indigo-500/50"
             />
           </div>
         </div>
-        
+
         {/* Industry tabs */}
-        <div className="flex gap-1 mt-4 overflow-x-auto pb-2">
+        <div className="flex gap-1 mt-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
           {INDUSTRIES.map(({ id, name, icon: Icon }) => (
             <button
               key={id}
@@ -536,8 +536,8 @@ export function TemplateLibrary({ onApply, onClose }: TemplateLibraryProps) {
               className={cn(
                 "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors",
                 selectedIndustry === id
-                  ? "bg-indigo-100 text-indigo-700"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                  : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white border border-transparent"
               )}
             >
               <Icon className="w-4 h-4" />
@@ -546,7 +546,7 @@ export function TemplateLibrary({ onApply, onClose }: TemplateLibraryProps) {
           ))}
         </div>
       </div>
-      
+
       {/* Template Grid */}
       <div className="flex-1 overflow-y-auto p-6">
         {selectedTemplate ? (
@@ -556,31 +556,31 @@ export function TemplateLibrary({ onApply, onClose }: TemplateLibraryProps) {
               variant="ghost"
               size="sm"
               onClick={() => setSelectedTemplate(null)}
-              className="mb-4"
+              className="mb-4 text-white/50 hover:text-white hover:bg-white/10"
             >
               ← Zpět na seznam
             </Button>
-            
+
             <div className="grid md:grid-cols-2 gap-6">
               {/* Preview */}
-              <div 
+              <div
                 className="aspect-video rounded-xl flex items-center justify-center relative overflow-hidden"
                 style={{ backgroundColor: selectedTemplate.colors.secondary }}
               >
-                <div 
+                <div
                   className="absolute inset-0 opacity-50"
-                  style={{ 
+                  style={{
                     background: `linear-gradient(135deg, ${selectedTemplate.colors.primary} 0%, ${selectedTemplate.colors.secondary} 100%)`
                   }}
                 />
                 <div className="relative z-10 text-center p-8">
-                  <h2 
+                  <h2
                     className="text-2xl font-bold mb-2"
                     style={{ color: selectedTemplate.colors.textLight }}
                   >
                     {selectedTemplate.headlines[0].replace(/{[^}]+}/g, '___')}
                   </h2>
-                  <p 
+                  <p
                     className="text-sm mb-4 opacity-90"
                     style={{ color: selectedTemplate.colors.textLight }}
                   >
@@ -588,68 +588,68 @@ export function TemplateLibrary({ onApply, onClose }: TemplateLibraryProps) {
                   </p>
                   <span
                     className="inline-block px-4 py-2 rounded-full text-sm font-semibold"
-                    style={{ 
+                    style={{
                       backgroundColor: selectedTemplate.colors.primary,
-                      color: selectedTemplate.colors.textLight 
+                      color: selectedTemplate.colors.textLight
                     }}
                   >
                     {selectedTemplate.ctas[0]}
                   </span>
                 </div>
               </div>
-              
+
               {/* Info */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <selectedTemplate.icon className="w-5 h-5 text-gray-400" />
-                  <span className="text-sm text-gray-500">{selectedTemplate.industry}</span>
-                  {selectedTemplate.isNew && <Badge>Novinka</Badge>}
+                  <selectedTemplate.icon className="w-5 h-5 text-white/40" />
+                  <span className="text-sm text-white/50">{selectedTemplate.industry}</span>
+                  {selectedTemplate.isNew && <Badge className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border-0">Novinka</Badge>}
                 </div>
-                
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedTemplate.name}</h3>
-                <p className="text-gray-600 mb-4">{selectedTemplate.description}</p>
-                
+
+                <h3 className="text-xl font-bold text-white mb-2">{selectedTemplate.name}</h3>
+                <p className="text-white/60 mb-4">{selectedTemplate.description}</p>
+
                 {/* Colors */}
                 <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Barvy</h4>
+                  <h4 className="text-sm font-medium text-white/70 mb-2">Barvy</h4>
                   <div className="flex gap-2">
                     {Object.entries(selectedTemplate.colors).slice(0, 3).map(([key, color]) => (
                       <div key={key} className="text-center">
-                        <div 
-                          className="w-10 h-10 rounded-lg border shadow-sm"
+                        <div
+                          className="w-10 h-10 rounded-lg border border-white/10 shadow-sm"
                           style={{ backgroundColor: color }}
                         />
-                        <span className="text-xs text-gray-500 mt-1 block">{key}</span>
+                        <span className="text-xs text-white/40 mt-1 block">{key}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-                
+
                 {/* Headlines */}
                 <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Headlines</h4>
+                  <h4 className="text-sm font-medium text-white/70 mb-2">Headlines</h4>
                   <div className="space-y-1">
                     {selectedTemplate.headlines.map((h, i) => (
-                      <p key={i} className="text-sm text-gray-600">• {h}</p>
+                      <p key={i} className="text-sm text-white/60">• {h}</p>
                     ))}
                   </div>
                 </div>
-                
+
                 {/* CTAs */}
                 <div className="mb-6">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">CTA varianty</h4>
+                  <h4 className="text-sm font-medium text-white/70 mb-2">CTA varianty</h4>
                   <div className="flex flex-wrap gap-2">
                     {selectedTemplate.ctas.map((cta, i) => (
-                      <Badge key={i} variant="outline">{cta}</Badge>
+                      <Badge key={i} variant="outline" className="border-white/10 text-white/60">{cta}</Badge>
                     ))}
                   </div>
                 </div>
-                
+
                 {/* Actions */}
                 <div className="flex gap-2">
                   <Button
                     onClick={() => handleApply(selectedTemplate)}
-                    className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
+                    className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 border-0 shadow-lg shadow-indigo-500/25"
                   >
                     <Check className="w-4 h-4 mr-2" />
                     Použít šablonu
@@ -657,6 +657,7 @@ export function TemplateLibrary({ onApply, onClose }: TemplateLibraryProps) {
                   <Button
                     variant="outline"
                     onClick={() => handleCreateBrandKit(selectedTemplate)}
+                    className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20"
                   >
                     <Palette className="w-4 h-4 mr-2" />
                     Vytvořit Brand Kit
@@ -671,75 +672,75 @@ export function TemplateLibrary({ onApply, onClose }: TemplateLibraryProps) {
             {filteredTemplates.map((template) => (
               <div
                 key={template.id}
-                className="border rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
+                className="border border-white/10 bg-white/5 rounded-xl overflow-hidden hover:bg-white/10 hover:border-white/20 hover:shadow-xl hover:shadow-black/20 transition-all cursor-pointer group"
                 onClick={() => setSelectedTemplate(template)}
               >
                 {/* Preview */}
-                <div 
+                <div
                   className="aspect-video relative"
-                  style={{ 
+                  style={{
                     background: `linear-gradient(135deg, ${template.colors.primary} 0%, ${template.colors.secondary} 100%)`
                   }}
                 >
                   <div className="absolute inset-0 flex items-center justify-center p-4">
                     <div className="text-center">
-                      <p 
-                        className="font-bold text-lg"
+                      <p
+                        className="font-bold text-lg drop-shadow-md"
                         style={{ color: template.colors.textLight }}
                       >
                         {template.headlines[0].replace(/{[^}]+}/g, '...')}
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* Badges */}
                   <div className="absolute top-2 right-2 flex gap-1">
                     {template.isNew && (
-                      <Badge className="bg-green-500">Nové</Badge>
+                      <Badge className="bg-emerald-500 text-white border-0 shadow-sm">Nové</Badge>
                     )}
                     {template.isPremium && (
-                      <Badge className="bg-yellow-500">
+                      <Badge className="bg-amber-500 text-white border-0 shadow-sm">
                         <Star className="w-3 h-3 mr-1" />
                         Pro
                       </Badge>
                     )}
                   </div>
-                  
+
                   {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Button variant="secondary" size="sm">
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                    <Button variant="secondary" size="sm" className="bg-white text-black hover:bg-white/90">
                       <Eye className="w-4 h-4 mr-2" />
                       Zobrazit
                     </Button>
                   </div>
                 </div>
-                
+
                 {/* Info */}
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <template.icon className="w-4 h-4 text-gray-400" />
-                      <span className="text-xs text-gray-500">{template.industry}</span>
+                      <template.icon className="w-4 h-4 text-white/40" />
+                      <span className="text-xs text-white/50">{template.industry}</span>
                     </div>
                     <div className="flex">
                       {[...Array(template.popularity)].map((_, i) => (
-                        <Star key={i} className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                        <Star key={i} className="w-3 h-3 text-amber-400 fill-amber-400" />
                       ))}
                     </div>
                   </div>
-                  
-                  <h4 className="font-semibold text-gray-900">{template.name}</h4>
-                  <p className="text-sm text-gray-500 line-clamp-1">{template.description}</p>
+
+                  <h4 className="font-semibold text-white">{template.name}</h4>
+                  <p className="text-sm text-white/50 line-clamp-1">{template.description}</p>
                 </div>
               </div>
             ))}
           </div>
         )}
-        
+
         {filteredTemplates.length === 0 && !selectedTemplate && (
           <div className="text-center py-12">
-            <LayoutTemplate className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">Žádné šablony neodpovídají vašemu hledání</p>
+            <LayoutTemplate className="w-12 h-12 text-white/20 mx-auto mb-4" />
+            <p className="text-white/40">Žádné šablony neodpovídají vašemu hledání</p>
           </div>
         )}
       </div>
