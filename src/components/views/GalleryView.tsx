@@ -1,27 +1,26 @@
 import { useState } from 'react'
 import {
-    Grid3X3, Download, Trash2, CheckSquare, Square,
-    Package, Image as ImageIcon, Filter
+    Grid3X3, Download, CheckSquare, Square,
+    Package, Image as ImageIcon, Code, Loader2
 } from 'lucide-react'
 import { useStore } from '@/stores/app-store'
 import { getFormatById } from '@/lib/formats'
+import { generateHTML5Zip } from '@/lib/html5-export'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
 
 export function GalleryView() {
     const {
-        creatives,
-        clearCreatives,
         sourceImage,
         selectedFormats,
-        platform
+        platform,
+        textOverlay
     } = useStore()
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [exporting, setExporting] = useState(false)
-    const [filterPlatform, setFilterPlatform] = useState<'all' | 'sklik' | 'google'>('all')
+    const [exportType, setExportType] = useState<'png' | 'html5'>('png')
 
-    // Get all formats that have source image
     const formatIds = Array.from(selectedFormats)
     const hasCreatives = sourceImage && formatIds.length > 0
 
@@ -43,7 +42,7 @@ export function GalleryView() {
         }
     }
 
-    const handleExportAll = async () => {
+    const handleExportPNG = async () => {
         if (!sourceImage || formatIds.length === 0) return
 
         setExporting(true)
@@ -52,22 +51,19 @@ export function GalleryView() {
             const zip = new JSZip()
             const folder = zip.folder(`creatives_${platform}`)
 
-            // Create canvas and export each format
             for (const formatId of formatIds) {
                 const format = getFormatById(formatId)
                 if (!format) continue
 
-                // Create temporary canvas
                 const canvas = document.createElement('canvas')
                 canvas.width = format.width
                 canvas.height = format.height
                 const ctx = canvas.getContext('2d')
                 if (!ctx) continue
 
-                // Load source image
                 const img = await loadImage(sourceImage)
 
-                // Calculate smart crop
+                // Smart crop
                 const imgRatio = img.width / img.height
                 const formatRatio = format.width / format.height
 
@@ -83,7 +79,11 @@ export function GalleryView() {
 
                 ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height)
 
-                // Convert to blob and add to zip
+                // Add text overlay if enabled
+                if (textOverlay.enabled) {
+                    drawTextOverlay(ctx, format, textOverlay)
+                }
+
                 const blob = await new Promise<Blob>((resolve) => {
                     canvas.toBlob((b) => resolve(b!), 'image/png')
                 })
@@ -92,7 +92,6 @@ export function GalleryView() {
                 folder?.file(filename, blob)
             }
 
-            // Generate and download zip
             const content = await zip.generateAsync({ type: 'blob' })
             saveAs(content, `adcreative_${platform}_${Date.now()}.zip`)
 
@@ -104,9 +103,43 @@ export function GalleryView() {
         setExporting(false)
     }
 
-    const handleExportSelected = async () => {
-        if (selectedIds.size === 0) return
-        await handleExportAll() // For now, export all - can be refined later
+    const handleExportHTML5 = async () => {
+        if (!sourceImage || formatIds.length === 0) return
+
+        setExporting(true)
+
+        try {
+            const zip = new JSZip()
+
+            for (const formatId of formatIds) {
+                const format = getFormatById(formatId)
+                if (!format) continue
+
+                const html5Zip = await generateHTML5Zip({
+                    imageUrl: sourceImage,
+                    width: format.width,
+                    height: format.height,
+                    animation: 'fade-in',
+                    headline: textOverlay.headline,
+                    subheadline: textOverlay.subheadline,
+                    cta: textOverlay.cta,
+                    ctaColor: textOverlay.ctaColor,
+                }, format.name)
+
+                const folderName = `${format.name.replace(/\s+/g, '_')}_${format.width}x${format.height}`
+                const html5Content = await html5Zip.arrayBuffer()
+                zip.file(`${folderName}.zip`, html5Content)
+            }
+
+            const content = await zip.generateAsync({ type: 'blob' })
+            saveAs(content, `adcreative_html5_${platform}_${Date.now()}.zip`)
+
+        } catch (error) {
+            console.error('HTML5 Export failed:', error)
+            alert('HTML5 export se nezdařil')
+        }
+
+        setExporting(false)
     }
 
     if (!hasCreatives) {
@@ -144,17 +177,41 @@ export function GalleryView() {
                         ) : (
                             <Square className="w-4 h-4" />
                         )}
-                        {selectedIds.size === formatIds.length ? 'Zrušit vše' : 'Vybrat vše'}
+                        {selectedIds.size === formatIds.length ? 'Zrušit' : 'Vybrat vše'}
                     </button>
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {/* Export Type Toggle */}
+                    <div className="flex rounded-lg border border-white/10 overflow-hidden">
+                        <button
+                            onClick={() => setExportType('png')}
+                            className={`px-3 py-2 text-sm flex items-center gap-1 ${exportType === 'png' ? 'bg-accent text-white' : 'bg-white/5 text-white/60'
+                                }`}
+                        >
+                            <ImageIcon className="w-4 h-4" />
+                            PNG
+                        </button>
+                        <button
+                            onClick={() => setExportType('html5')}
+                            className={`px-3 py-2 text-sm flex items-center gap-1 ${exportType === 'html5' ? 'bg-accent text-white' : 'bg-white/5 text-white/60'
+                                }`}
+                        >
+                            <Code className="w-4 h-4" />
+                            HTML5
+                        </button>
+                    </div>
+
                     <button
-                        onClick={handleExportAll}
+                        onClick={exportType === 'png' ? handleExportPNG : handleExportHTML5}
                         disabled={exporting}
                         className="btn-accent flex items-center gap-2 text-sm"
                     >
-                        <Package className="w-4 h-4" />
+                        {exporting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Package className="w-4 h-4" />
+                        )}
                         {exporting ? 'Exportuji...' : 'Export ZIP'}
                     </button>
                 </div>
@@ -179,12 +236,11 @@ export function GalleryView() {
                                         : 'border-white/10 hover:border-white/20'
                                     }`}
                             >
-                                {/* Preview */}
                                 <div
                                     className="bg-dark-800 flex items-center justify-center p-4"
                                     style={{ aspectRatio: Math.min(aspectRatio, 2).toString() }}
                                 >
-                                    {sourceImage ? (
+                                    {sourceImage && (
                                         <img
                                             src={sourceImage}
                                             alt={format.name}
@@ -194,12 +250,9 @@ export function GalleryView() {
                                                 maxHeight: '150px'
                                             }}
                                         />
-                                    ) : (
-                                        <ImageIcon className="w-8 h-8 text-white/20" />
                                     )}
                                 </div>
 
-                                {/* Info */}
                                 <div className="p-3 bg-white/5">
                                     <div className="font-medium text-sm">{format.name}</div>
                                     <div className="text-xs text-white/40">
@@ -208,7 +261,6 @@ export function GalleryView() {
                                     </div>
                                 </div>
 
-                                {/* Selection indicator */}
                                 <div className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center transition-all ${isSelected ? 'bg-accent' : 'bg-black/50'
                                     }`}>
                                     {isSelected && <CheckSquare className="w-4 h-4 text-white" />}
@@ -222,7 +274,6 @@ export function GalleryView() {
     )
 }
 
-// Helper function to load image
 function loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
         const img = new window.Image()
@@ -231,4 +282,75 @@ function loadImage(src: string): Promise<HTMLImageElement> {
         img.onerror = reject
         img.src = src
     })
+}
+
+function drawTextOverlay(
+    ctx: CanvasRenderingContext2D,
+    format: { width: number; height: number },
+    overlay: { headline: string; subheadline: string; cta: string; ctaColor: string; position: string }
+) {
+    const padding = Math.min(format.width, format.height) * 0.05
+    const headlineSize = Math.min(format.width, format.height) * 0.08
+    const subSize = headlineSize * 0.6
+    const ctaSize = headlineSize * 0.5
+
+    let x = padding
+    let y = format.height - padding
+
+    if (overlay.position.includes('center')) {
+        x = format.width / 2
+    } else if (overlay.position.includes('right')) {
+        x = format.width - padding
+    }
+
+    if (overlay.position.includes('top')) {
+        y = padding + headlineSize
+    } else if (overlay.position === 'center') {
+        y = format.height / 2
+    }
+
+    ctx.textAlign = overlay.position.includes('center') ? 'center' :
+        overlay.position.includes('right') ? 'right' : 'left'
+
+    // Headline
+    if (overlay.headline) {
+        ctx.font = `bold ${headlineSize}px Arial`
+        ctx.fillStyle = '#ffffff'
+        ctx.shadowColor = 'rgba(0,0,0,0.8)'
+        ctx.shadowBlur = 4
+        ctx.fillText(overlay.headline, x, y - subSize - ctaSize - 20)
+    }
+
+    // Subheadline
+    if (overlay.subheadline) {
+        ctx.font = `${subSize}px Arial`
+        ctx.fillStyle = 'rgba(255,255,255,0.9)'
+        ctx.fillText(overlay.subheadline, x, y - ctaSize - 10)
+    }
+
+    // CTA
+    if (overlay.cta) {
+        ctx.font = `bold ${ctaSize}px Arial`
+        const ctaWidth = ctx.measureText(overlay.cta).width + 30
+        const ctaHeight = ctaSize + 16
+
+        let ctaX = x
+        if (overlay.position.includes('center')) {
+            ctaX = x - ctaWidth / 2
+        } else if (overlay.position.includes('right')) {
+            ctaX = x - ctaWidth
+        }
+
+        ctx.shadowBlur = 0
+        ctx.fillStyle = overlay.ctaColor
+        ctx.beginPath()
+        ctx.roundRect(ctaX, y - ctaHeight, ctaWidth, ctaHeight, 6)
+        ctx.fill()
+
+        ctx.fillStyle = '#ffffff'
+        ctx.textAlign = 'center'
+        ctx.fillText(overlay.cta, ctaX + ctaWidth / 2, y - 8)
+    }
+
+    ctx.shadowBlur = 0
 }

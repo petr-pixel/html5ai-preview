@@ -6,8 +6,9 @@ import { EditorView } from '@/components/views/EditorView'
 import { GalleryView } from '@/components/views/GalleryView'
 import { VideoView } from '@/components/views/VideoView'
 import { SettingsView } from '@/components/views/SettingsView'
+import { BrandKitView } from '@/components/views/BrandKitView'
 
-export type ViewType = 'generator' | 'editor' | 'gallery' | 'video' | 'settings'
+export type ViewType = 'generator' | 'editor' | 'gallery' | 'video' | 'settings' | 'brandkit'
 
 function App() {
     const [currentView, setCurrentView] = useState<ViewType>('generator')
@@ -24,6 +25,8 @@ function App() {
                 return <VideoView />
             case 'settings':
                 return <SettingsView />
+            case 'brandkit':
+                return <BrandKitView />
             default:
                 return <GeneratorView onGenerate={() => setCurrentView('editor')} />
         }
