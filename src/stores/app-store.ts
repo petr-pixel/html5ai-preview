@@ -29,8 +29,8 @@ interface AppState {
     platform: 'sklik' | 'google'
     setPlatform: (platform: 'sklik' | 'google') => void
 
-    // Selected formats
-    selectedFormats: Set<string>
+    // Selected formats (using array for serialization)
+    selectedFormats: string[]
     toggleFormat: (id: string) => void
     selectAllFormats: (ids: string[]) => void
     clearFormats: () => void
@@ -73,18 +73,17 @@ export const useStore = create<AppState>()(
             setPlatform: (platform) => set({ platform }),
 
             // Selected formats
-            selectedFormats: new Set<string>(),
+            selectedFormats: [] as string[],
             toggleFormat: (id) => set((state) => {
-                const newSet = new Set(state.selectedFormats)
-                if (newSet.has(id)) {
-                    newSet.delete(id)
+                const exists = state.selectedFormats.includes(id)
+                if (exists) {
+                    return { selectedFormats: state.selectedFormats.filter(f => f !== id) }
                 } else {
-                    newSet.add(id)
+                    return { selectedFormats: [...state.selectedFormats, id] }
                 }
-                return { selectedFormats: newSet }
             }),
-            selectAllFormats: (ids) => set({ selectedFormats: new Set(ids) }),
-            clearFormats: () => set({ selectedFormats: new Set() }),
+            selectAllFormats: (ids) => set({ selectedFormats: ids }),
+            clearFormats: () => set({ selectedFormats: [] }),
 
             // Source image
             sourceImage: null,

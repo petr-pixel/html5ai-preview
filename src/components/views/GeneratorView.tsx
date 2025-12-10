@@ -38,7 +38,7 @@ export function GeneratorView({ onGenerate }: GeneratorViewProps) {
     }
 
     const handleGenerate = async () => {
-        if (!prompt.trim() || !apiKey || selectedFormats.size === 0) return
+        if (!prompt.trim() || !apiKey || selectedFormats.length === 0) return
 
         setIsGenerating(true)
         try {
@@ -57,7 +57,7 @@ export function GeneratorView({ onGenerate }: GeneratorViewProps) {
     }
 
     const handleSelectAll = () => {
-        if (selectedFormats.size === allFormatIds.length) {
+        if (selectedFormats.length === allFormatIds.length) {
             clearFormats()
         } else {
             selectAllFormats(allFormatIds)
@@ -74,7 +74,7 @@ export function GeneratorView({ onGenerate }: GeneratorViewProps) {
         setExpandedCategories(newSet)
     }
 
-    const allSelected = selectedFormats.size === allFormatIds.length && allFormatIds.length > 0
+    const allSelected = selectedFormats.length === allFormatIds.length && allFormatIds.length > 0
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn">
@@ -134,8 +134,8 @@ export function GeneratorView({ onGenerate }: GeneratorViewProps) {
                         <button
                             onClick={() => { setPlatform('sklik'); clearFormats() }}
                             className={`flex-1 p-3 rounded-xl border transition-all ${platform === 'sklik'
-                                    ? 'border-accent bg-accent/10 text-white'
-                                    : 'border-white/10 text-white/60 hover:border-white/20'
+                                ? 'border-accent bg-accent/10 text-white'
+                                : 'border-white/10 text-white/60 hover:border-white/20'
                                 }`}
                         >
                             <span className="font-medium">🇨🇿 Sklik</span>
@@ -143,8 +143,8 @@ export function GeneratorView({ onGenerate }: GeneratorViewProps) {
                         <button
                             onClick={() => { setPlatform('google'); clearFormats() }}
                             className={`flex-1 p-3 rounded-xl border transition-all ${platform === 'google'
-                                    ? 'border-accent bg-accent/10 text-white'
-                                    : 'border-white/10 text-white/60 hover:border-white/20'
+                                ? 'border-accent bg-accent/10 text-white'
+                                : 'border-white/10 text-white/60 hover:border-white/20'
                                 }`}
                         >
                             <span className="font-medium">🌐 Google Ads</span>
@@ -155,7 +155,7 @@ export function GeneratorView({ onGenerate }: GeneratorViewProps) {
                 {/* Format Selection */}
                 <div>
                     <div className="flex items-center justify-between mb-2">
-                        <label className="text-sm text-white/60">Formáty ({selectedFormats.size} vybráno)</label>
+                        <label className="text-sm text-white/60">Formáty ({selectedFormats.length} vybráno)</label>
                         <button
                             onClick={handleSelectAll}
                             className="text-sm text-accent hover:text-accent-hover"
@@ -179,7 +179,7 @@ export function GeneratorView({ onGenerate }: GeneratorViewProps) {
                                         )}
                                         <span className="font-medium">{category.name}</span>
                                         <span className="text-xs text-white/40">
-                                            ({category.formats.filter(f => selectedFormats.has(f.id)).length}/{category.formats.length})
+                                            ({category.formats.filter(f => selectedFormats.includes(f.id)).length}/{category.formats.length})
                                         </span>
                                     </div>
                                 </button>
@@ -190,14 +190,14 @@ export function GeneratorView({ onGenerate }: GeneratorViewProps) {
                                             <button
                                                 key={format.id}
                                                 onClick={() => toggleFormat(format.id)}
-                                                className={`p-2 rounded-lg border text-left text-sm transition-all ${selectedFormats.has(format.id)
-                                                        ? 'border-accent bg-accent/10'
-                                                        : 'border-white/10 hover:border-white/20'
+                                                className={`p-2 rounded-lg border text-left text-sm transition-all ${selectedFormats.includes(format.id)
+                                                    ? 'border-accent bg-accent/10'
+                                                    : 'border-white/10 hover:border-white/20'
                                                     }`}
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <span className="font-medium">{format.name}</span>
-                                                    {selectedFormats.has(format.id) && (
+                                                    {selectedFormats.includes(format.id) && (
                                                         <Check className="w-4 h-4 text-accent" />
                                                     )}
                                                 </div>
@@ -216,7 +216,7 @@ export function GeneratorView({ onGenerate }: GeneratorViewProps) {
                 {/* Generate Button */}
                 <button
                     onClick={handleGenerate}
-                    disabled={!prompt.trim() || !apiKey || selectedFormats.size === 0 || isGenerating}
+                    disabled={!prompt.trim() || !apiKey || selectedFormats.length === 0 || isGenerating}
                     className="btn-accent w-full py-4 text-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {isGenerating ? (
@@ -227,7 +227,7 @@ export function GeneratorView({ onGenerate }: GeneratorViewProps) {
                     ) : (
                         <>
                             <Wand2 className="w-5 h-5" />
-                            Generovat {selectedFormats.size} kreativ
+                            Generovat {selectedFormats.length} kreativ
                             <ChevronRight className="w-5 h-5" />
                         </>
                     )}
