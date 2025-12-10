@@ -1,0 +1,204 @@
+/**
+ * HTML5 Banner Export
+ * Generates HTML5 animated banners
+ */
+
+export type AnimationPreset = 'static' | 'fade-in' | 'slide-up' | 'ken-burns' | 'pulse-cta'
+
+interface HTML5ExportOptions {
+    imageUrl: string
+    width: number
+    height: number
+    animation: AnimationPreset
+    headline?: string
+    subheadline?: string
+    cta?: string
+    ctaColor?: string
+    ctaUrl?: string
+}
+
+/**
+ * Generate HTML5 banner content
+ */
+export function generateHTML5Banner(options: HTML5ExportOptions): string {
+    const {
+        imageUrl,
+        width,
+        height,
+        animation,
+        headline = '',
+        subheadline = '',
+        cta = '',
+        ctaColor = '#f97316',
+        ctaUrl = '#'
+    } = options
+
+    const animationCSS = getAnimationCSS(animation)
+    const animationClass = animation !== 'static' ? `animation-${animation}` : ''
+
+    return `<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=${width}, height=${height}">
+  <meta name="ad.size" content="width=${width},height=${height}">
+  <title>Banner ${width}x${height}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    .banner {
+      width: ${width}px;
+      height: ${height}px;
+      position: relative;
+      overflow: hidden;
+      font-family: 'Arial', sans-serif;
+      cursor: pointer;
+    }
+    
+    .background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .content {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: ${Math.min(width, height) * 0.05}px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    }
+    
+    .headline {
+      color: #fff;
+      font-size: ${Math.min(width, height) * 0.08}px;
+      font-weight: bold;
+      margin-bottom: 4px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    }
+    
+    .subheadline {
+      color: rgba(255,255,255,0.9);
+      font-size: ${Math.min(width, height) * 0.05}px;
+      margin-bottom: 8px;
+    }
+    
+    .cta {
+      display: inline-block;
+      padding: 8px 16px;
+      background: ${ctaColor};
+      color: #fff;
+      font-size: ${Math.min(width, height) * 0.045}px;
+      font-weight: bold;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+    
+    ${animationCSS}
+  </style>
+</head>
+<body>
+  <div class="banner ${animationClass}" onclick="window.open('${ctaUrl}', '_blank')">
+    <img class="background" src="${imageUrl}" alt="Banner">
+    <div class="content">
+      ${headline ? `<div class="headline">${headline}</div>` : ''}
+      ${subheadline ? `<div class="subheadline">${subheadline}</div>` : ''}
+      ${cta ? `<a href="${ctaUrl}" class="cta">${cta}</a>` : ''}
+    </div>
+  </div>
+</body>
+</html>`
+}
+
+function getAnimationCSS(animation: AnimationPreset): string {
+    switch (animation) {
+        case 'fade-in':
+            return `
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .animation-fade-in .background {
+      animation: fadeIn 1s ease-out;
+    }
+    .animation-fade-in .content {
+      animation: fadeIn 1.5s ease-out 0.5s both;
+    }`
+
+        case 'slide-up':
+            return `
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .animation-slide-up .content {
+      animation: slideUp 0.8s ease-out 0.3s both;
+    }`
+
+        case 'ken-burns':
+            return `
+    @keyframes kenBurns {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.1); }
+    }
+    .animation-ken-burns .background {
+      animation: kenBurns 10s ease-out forwards;
+    }`
+
+        case 'pulse-cta':
+            return `
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    .animation-pulse-cta .cta {
+      animation: pulse 2s ease-in-out infinite;
+    }`
+
+        default:
+            return ''
+    }
+}
+
+/**
+ * Generate ZIP with HTML5 banner files
+ */
+export async function generateHTML5Zip(
+    options: HTML5ExportOptions,
+    formatName: string
+): Promise<Blob> {
+    const JSZip = (await import('jszip')).default
+    const zip = new JSZip()
+
+    // Add HTML file
+    const html = generateHTML5Banner(options)
+    zip.file('index.html', html)
+
+    // Add image (fetch and convert to blob)
+    try {
+        const response = await fetch(options.imageUrl)
+        const imageBlob = await response.blob()
+        zip.file('background.jpg', imageBlob)
+    } catch (e) {
+        console.warn('Could not include image in ZIP')
+    }
+
+    // Add readme
+    zip.file('README.txt', `HTML5 Banner - ${formatName}
+Dimensions: ${options.width}x${options.height}
+Animation: ${options.animation}
+
+Usage:
+1. Upload all files to your ad server
+2. Set click-through URL in the HTML file
+3. Test in multiple browsers
+
+Generated by AdCreative Studio
+`)
+
+    return zip.generateAsync({ type: 'blob' })
+}
